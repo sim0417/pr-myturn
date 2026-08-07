@@ -1,0 +1,1060 @@
+<title>PR 현황 보드</title>
+<style>
+  :root {
+    --ground: #f4f6f8;
+    --surface: #ffffff;
+    --surface-2: #eef1f4;
+    --ink: #141a20;
+    --ink-2: #3c4854;
+    --muted: #5c6874;
+    --line: #dde3e9;
+    --line-strong: #c6cfd8;
+    --accent: #12626e;
+    --accent-soft: #e2f0f2;
+    --wait: #8a5a00;
+    --wait-soft: #f8eeda;
+    --reply: #a32b22;
+    --reply-soft: #fbe8e5;
+    --ready: #186b45;
+    --ready-soft: #e0f0e8;
+    --radius: 3px;
+    --shadow: 0 1px 2px rgba(20, 26, 32, .05), 0 6px 16px -10px rgba(20, 26, 32, .16);
+    --ui: -apple-system, BlinkMacSystemFont, "Apple SD Gothic Neo", "Pretendard",
+          "Noto Sans KR", "Malgun Gothic", sans-serif;
+    --mono: ui-monospace, SFMono-Regular, "SF Mono", Menlo, "Roboto Mono", monospace;
+  }
+
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --ground: #101317;
+      --surface: #171b20;
+      --surface-2: #1e242a;
+      --ink: #e3e8ed;
+      --ink-2: #b8c2cc;
+      --muted: #8d9aa7;
+      --line: #262d34;
+      --line-strong: #364049;
+      --accent: #4bb3c1;
+      --accent-soft: #16303a;
+      --wait: #d7a03a;
+      --wait-soft: #2e2618;
+      --reply: #e58b7f;
+      --reply-soft: #33201e;
+      --ready: #5bbe8c;
+      --ready-soft: #172c23;
+      --shadow: 0 1px 2px rgba(0, 0, 0, .4), 0 8px 20px -12px rgba(0, 0, 0, .6);
+    }
+  }
+
+  :root[data-theme="dark"] {
+    --ground: #101317;
+    --surface: #171b20;
+    --surface-2: #1e242a;
+    --ink: #e3e8ed;
+    --ink-2: #b8c2cc;
+    --muted: #8d9aa7;
+    --line: #262d34;
+    --line-strong: #364049;
+    --accent: #4bb3c1;
+    --accent-soft: #16303a;
+    --wait: #d7a03a;
+    --wait-soft: #2e2618;
+    --reply: #e58b7f;
+    --reply-soft: #33201e;
+    --ready: #5bbe8c;
+    --ready-soft: #172c23;
+    --shadow: 0 1px 2px rgba(0, 0, 0, .4), 0 8px 20px -12px rgba(0, 0, 0, .6);
+  }
+
+  :root[data-theme="light"] {
+    --ground: #f4f6f8;
+    --surface: #ffffff;
+    --surface-2: #eef1f4;
+    --ink: #141a20;
+    --ink-2: #3c4854;
+    --muted: #5c6874;
+    --line: #dde3e9;
+    --line-strong: #c6cfd8;
+    --accent: #12626e;
+    --accent-soft: #e2f0f2;
+    --wait: #8a5a00;
+    --wait-soft: #f8eeda;
+    --reply: #a32b22;
+    --reply-soft: #fbe8e5;
+    --ready: #186b45;
+    --ready-soft: #e0f0e8;
+    --shadow: 0 1px 2px rgba(20, 26, 32, .05), 0 6px 16px -10px rgba(20, 26, 32, .16);
+  }
+
+  body {
+    margin: 0;
+    background: var(--ground);
+    color: var(--ink);
+    font-family: var(--ui);
+    font-size: 15px;
+    line-height: 1.55;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  .wrap {
+    max-width: 1080px;
+    margin: 0 auto;
+    padding: 40px 24px 72px;
+    display: flex;
+    flex-direction: column;
+    gap: 36px;
+  }
+
+  /* ── header ─────────────────────────────────────────── */
+  .masthead {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 12px 24px;
+    padding-bottom: 18px;
+    border-bottom: 2px solid var(--line-strong);
+  }
+
+  .masthead h1 {
+    margin: 0;
+    font-size: 26px;
+    font-weight: 640;
+    letter-spacing: -.015em;
+    text-wrap: balance;
+  }
+
+  .masthead h1 .who {
+    color: var(--accent);
+  }
+
+  .stamp {
+    font-family: var(--mono);
+    font-size: 12px;
+    color: var(--muted);
+    font-variant-numeric: tabular-nums;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+
+  .stamp .dot {
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    background: var(--accent);
+    flex: none;
+  }
+
+  /* ── summary tiles ──────────────────────────────────── */
+  .tiles {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+    gap: 12px;
+  }
+
+  .tile {
+    background: var(--surface);
+    border: 1px solid var(--line);
+    border-top: 3px solid var(--tone, var(--line-strong));
+    border-radius: var(--radius);
+    padding: 16px 18px 18px;
+    box-shadow: var(--shadow);
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+  }
+
+  .tile .label {
+    font-size: 11px;
+    font-weight: 620;
+    letter-spacing: .09em;
+    text-transform: uppercase;
+    color: var(--muted);
+  }
+
+  .tile .figure {
+    font-family: var(--mono);
+    font-size: 34px;
+    line-height: 1.1;
+    font-weight: 600;
+    font-variant-numeric: tabular-nums;
+    color: var(--tone, var(--ink));
+  }
+
+  .tile .figure .unit {
+    font-size: 14px;
+    font-weight: 500;
+    color: var(--muted);
+    margin-left: 3px;
+  }
+
+  .tile .note {
+    font-size: 12.5px;
+    color: var(--muted);
+  }
+
+  /* ── sections ───────────────────────────────────────── */
+  section {
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+  }
+
+  .sec-head {
+    display: flex;
+    align-items: baseline;
+    gap: 10px;
+    flex-wrap: wrap;
+  }
+
+  .sec-head h2 {
+    margin: 0;
+    font-size: 15px;
+    font-weight: 640;
+    letter-spacing: .01em;
+  }
+
+  .sec-head .count {
+    font-family: var(--mono);
+    font-size: 12px;
+    font-variant-numeric: tabular-nums;
+    color: var(--muted);
+    background: var(--surface-2);
+    border-radius: 999px;
+    padding: 1px 9px;
+  }
+
+  .sec-head .desc {
+    font-size: 12.5px;
+    color: var(--muted);
+    margin-left: auto;
+  }
+
+  .rows {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+  }
+
+  .row {
+    position: relative;
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto auto;
+    align-items: center;
+    gap: 8px 16px;
+    background: var(--surface);
+    border: 1px solid var(--line);
+    border-left: 3px solid var(--tone, var(--line-strong));
+    border-radius: var(--radius);
+    padding: 13px 16px 13px 15px;
+    box-shadow: var(--shadow);
+    transition: border-color .14s ease, transform .14s ease;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .row { transition: none; }
+  }
+
+  .row:hover,
+  .row:focus-within {
+    border-color: var(--line-strong);
+    border-left-color: var(--tone, var(--line-strong));
+  }
+
+  .meta {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex-wrap: wrap;
+    margin-bottom: 3px;
+  }
+
+  .repo {
+    font-family: var(--mono);
+    font-size: 11.5px;
+    color: var(--muted);
+    background: var(--surface-2);
+    border-radius: var(--radius);
+    padding: 1px 6px;
+  }
+
+  .num {
+    font-family: var(--mono);
+    font-size: 11.5px;
+    font-variant-numeric: tabular-nums;
+    color: var(--accent);
+    font-weight: 600;
+  }
+
+  .author {
+    font-size: 11.5px;
+    color: var(--muted);
+  }
+
+  .row a.title {
+    color: var(--ink);
+    text-decoration: none;
+    font-size: 14.5px;
+    font-weight: 520;
+    letter-spacing: -.003em;
+    display: inline-block;
+    border-bottom: 1px solid transparent;
+  }
+
+  .row a.title:hover { border-bottom-color: var(--line-strong); }
+
+  .row a.title:focus-visible {
+    outline: 2px solid var(--accent);
+    outline-offset: 3px;
+    border-radius: 2px;
+  }
+
+  /* ── age gauge ──────────────────────────────────────── */
+  .age {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-end;
+    gap: 5px;
+    min-width: 108px;
+  }
+
+  .age .val {
+    font-family: var(--mono);
+    font-size: 12px;
+    font-variant-numeric: tabular-nums;
+    color: var(--tone, var(--muted));
+    font-weight: 600;
+    white-space: nowrap;
+  }
+
+  .bar {
+    width: 100px;
+    height: 4px;
+    background: var(--surface-2);
+    border-radius: 999px;
+    overflow: hidden;
+  }
+
+  .bar > i {
+    display: block;
+    height: 100%;
+    background: var(--tone, var(--muted));
+    border-radius: 999px;
+  }
+
+  .pill {
+    font-size: 11px;
+    font-weight: 620;
+    letter-spacing: .04em;
+    padding: 2px 8px;
+    border-radius: 999px;
+    background: var(--tone-soft, var(--surface-2));
+    color: var(--tone, var(--muted));
+    white-space: nowrap;
+  }
+
+  /* ── thread quote ───────────────────────────────────── */
+  .thread {
+    grid-column: 1 / -1;
+    margin-top: 10px;
+    padding: 12px 14px;
+    background: var(--surface-2);
+    border-radius: var(--radius);
+    display: flex;
+    flex-direction: column;
+    gap: 9px;
+  }
+
+  .thread .path {
+    font-family: var(--mono);
+    font-size: 11px;
+    color: var(--muted);
+    overflow-x: auto;
+    white-space: nowrap;
+  }
+
+  .turn {
+    display: grid;
+    grid-template-columns: 62px minmax(0, 1fr);
+    gap: 10px;
+    align-items: start;
+    font-size: 13px;
+    line-height: 1.5;
+  }
+
+  .turn .by {
+    font-size: 11px;
+    font-weight: 640;
+    letter-spacing: .05em;
+    text-transform: uppercase;
+    color: var(--muted);
+    padding-top: 2px;
+  }
+
+  .turn.mine .by { color: var(--accent); }
+  .turn.theirs .by { color: var(--reply); }
+  .turn p { margin: 0; color: var(--ink-2); }
+
+  .copy {
+    font: inherit;
+    font-size: 11.5px;
+    font-weight: 600;
+    letter-spacing: .01em;
+    color: var(--muted);
+    background: transparent;
+    border: 1px solid var(--line);
+    border-radius: var(--radius);
+    padding: 3px 9px;
+    cursor: pointer;
+    white-space: nowrap;
+    transition: color .12s ease, border-color .12s ease, background .12s ease;
+  }
+
+  .copy:hover {
+    color: var(--accent);
+    border-color: var(--accent);
+  }
+
+  .copy:focus-visible {
+    outline: 2px solid var(--accent);
+    outline-offset: 2px;
+  }
+
+  .copy[data-done="1"] {
+    color: var(--ready);
+    border-color: var(--ready);
+    background: var(--ready-soft);
+  }
+
+  .copy[data-failed="1"] {
+    color: var(--reply);
+    border-color: var(--reply);
+    background: var(--reply-soft);
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .copy { transition: none; }
+  }
+
+  /* 행 안의 개별 복사 버튼은 평소 흐리게, 포커스·호버 때 또렷하게 */
+  .row .copy {
+    opacity: .45;
+    align-self: center;
+  }
+
+  .row:hover .copy,
+  .row:focus-within .copy { opacity: 1; }
+
+  .sec-head .copy { margin-left: auto; }
+  .sec-head .desc + .copy { margin-left: 12px; }
+
+  .empty {
+    background: var(--surface);
+    border: 1px dashed var(--line-strong);
+    border-radius: var(--radius);
+    padding: 18px;
+    text-align: center;
+    color: var(--muted);
+    font-size: 13.5px;
+  }
+
+  /* ── archive ────────────────────────────────────────── */
+  .archive {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(232px, 1fr));
+    gap: 6px 20px;
+  }
+
+  .archive a {
+    display: flex;
+    align-items: baseline;
+    gap: 8px;
+    padding: 6px 0;
+    border-bottom: 1px solid var(--line);
+    color: var(--ink-2);
+    text-decoration: none;
+    font-size: 13px;
+  }
+
+  .archive a:hover { color: var(--ink); }
+
+  .archive a:focus-visible {
+    outline: 2px solid var(--accent);
+    outline-offset: 2px;
+  }
+
+  .archive .n {
+    font-family: var(--mono);
+    font-size: 11.5px;
+    font-variant-numeric: tabular-nums;
+    color: var(--muted);
+    flex: none;
+  }
+
+  .archive .t {
+    flex: 1;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .archive .c {
+    font-family: var(--mono);
+    font-size: 11px;
+    color: var(--reply);
+    flex: none;
+  }
+
+  /* ── footer ─────────────────────────────────────────── */
+  footer {
+    border-top: 1px solid var(--line);
+    padding-top: 18px;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    font-size: 12.5px;
+    color: var(--muted);
+  }
+
+  footer code {
+    font-family: var(--mono);
+    font-size: 11.5px;
+    background: var(--surface-2);
+    color: var(--ink-2);
+    padding: 2px 6px;
+    border-radius: var(--radius);
+  }
+
+  .cmds {
+    display: flex;
+    flex-direction: column;
+    gap: 5px;
+    overflow-x: auto;
+  }
+
+  @media (max-width: 620px) {
+    .wrap { padding: 28px 16px 56px; }
+    .row { grid-template-columns: minmax(0, 1fr); }
+    .row .copy { opacity: 1; justify-self: start; }
+    .age { align-items: flex-start; }
+    .sec-head .desc { margin-left: 0; flex-basis: 100%; }
+  }
+</style>
+
+<div class="wrap">
+  <header class="masthead">
+    <h1><span class="who" id="owner"></span>PR 현황 보드</h1>
+    <div class="stamp"><span class="dot"></span><span id="stamp"></span></div>
+  </header>
+
+  <div class="tiles" id="tiles"></div>
+
+  <section>
+    <div class="sec-head" id="h-wait">
+      <h2>내 PR — 리뷰 대기</h2>
+      <span class="count" id="c-wait"></span>
+      <span class="desc">승인 0건. 대기 일수 순</span>
+    </div>
+    <div class="rows" id="wait"></div>
+  </section>
+
+  <section>
+    <div class="sec-head">
+      <h2>내 PR — 응답 필요</h2>
+      <span class="count" id="c-reply"></span>
+      <span class="desc">상대 코멘트에 내 답이 없는 건</span>
+    </div>
+    <div class="rows" id="reply"></div>
+  </section>
+
+  <section>
+    <div class="sec-head" id="h-ready">
+      <h2>내 PR — 머지 대기</h2>
+      <span class="count" id="c-ready"></span>
+      <span class="desc">승인받고 아직 머지하지 않은 건</span>
+    </div>
+    <div class="rows" id="ready"></div>
+  </section>
+
+  <section>
+    <div class="sec-head">
+      <h2>내가 리뷰한 PR — 답글 도착</h2>
+      <span class="count" id="c-rev"></span>
+      <span class="desc">내 지적에 리뷰이가 답한 미해결 스레드</span>
+    </div>
+    <div class="rows" id="rev"></div>
+  </section>
+
+  <section>
+    <div class="sec-head">
+      <h2>이미 머지된 PR의 미확인 답글</h2>
+      <span class="count" id="c-arc"></span>
+      <span class="desc">참고용. 대부분 종결된 논의</span>
+    </div>
+    <div class="archive" id="arc"></div>
+  </section>
+
+  <footer>
+    <div id="freshness"></div>
+    <div class="cmds">
+      <div><code>pr-dashboard.sh</code> — 새로 수집해서 열기 · <code>--serve</code> 로 띄우면 새로고침마다 재수집</div>
+      <div><code>pr-dashboard.sh --full</code> — 머지된 PR 답글까지 강제 재수집</div>
+    </div>
+    <div id="excluded"></div>
+  </footer>
+</div>
+
+<script>
+  /* 빌드 시 pr-dashboard.sh 가 실제 데이터를 주입한다. */
+  const DATA = {
+  "generatedAt": "2026-08-07T06:24:29Z",
+  "closedAgeSec": 420,
+  "mine": [
+    {
+      "repo": "acme/acme-web",
+      "num": 412,
+      "title": "Feat: 검색 결과 무한 스크롤 도입",
+      "url": "https://github.com/acme/acme-web/pull/412",
+      "created": "2026-08-01T20:48:29Z",
+      "mergeable": "MERGEABLE",
+      "approvals": [],
+      "changesRequested": [],
+      "unresolvedThreads": [],
+      "pendingReply": null
+    },
+    {
+      "repo": "acme/acme-web",
+      "num": 418,
+      "title": "Refactor: 결제 폼 상태를 리듀서로 정리",
+      "url": "https://github.com/acme/acme-web/pull/418",
+      "created": "2026-08-04T04:00:29Z",
+      "mergeable": "MERGEABLE",
+      "approvals": [],
+      "changesRequested": [],
+      "unresolvedThreads": [],
+      "pendingReply": null
+    },
+    {
+      "repo": "acme/design-system",
+      "num": 77,
+      "title": "Feat: Toast 컴포넌트 variant 추가",
+      "url": "https://github.com/acme/design-system/pull/77",
+      "created": "2026-08-06T16:00:29Z",
+      "mergeable": "MERGEABLE",
+      "approvals": [],
+      "changesRequested": [],
+      "unresolvedThreads": [],
+      "pendingReply": null
+    },
+    {
+      "repo": "acme/acme-web",
+      "num": 405,
+      "title": "Fix: 장바구니 수량 변경 시 합계가 갱신되지 않던 문제",
+      "url": "https://github.com/acme/acme-web/pull/405",
+      "created": "2026-08-01T01:36:29Z",
+      "mergeable": "MERGEABLE",
+      "approvals": [],
+      "changesRequested": [],
+      "unresolvedThreads": [],
+      "pendingReply": {
+        "by": "monalisa",
+        "at": "2026-08-06T11:12:29Z",
+        "snippet": "이거 배포 순서가 API 쪽 변경보다 먼저여야 하나요? 릴리스 노트에 적어둘게요."
+      }
+    },
+    {
+      "repo": "acme/acme-web",
+      "num": 421,
+      "title": "Chore: 사용하지 않는 아이콘 에셋 정리",
+      "url": "https://github.com/acme/acme-web/pull/421",
+      "created": "2026-08-06T01:36:29Z",
+      "mergeable": "MERGEABLE",
+      "approvals": [
+        "monalisa"
+      ],
+      "changesRequested": [],
+      "unresolvedThreads": [],
+      "pendingReply": null
+    },
+    {
+      "repo": "acme/api-gateway",
+      "num": 156,
+      "title": "Feat: 요청 로깅에 트레이스 ID 전파",
+      "url": "https://github.com/acme/api-gateway/pull/156",
+      "created": "2026-08-04T23:12:29Z",
+      "mergeable": "MERGEABLE",
+      "approvals": [
+        "hubot",
+        "monalisa"
+      ],
+      "changesRequested": [],
+      "unresolvedThreads": [],
+      "pendingReply": null
+    }
+  ],
+  "reviewedOpen": [
+    {
+      "repo": "acme/api-gateway",
+      "num": 151,
+      "title": "Perf: 커넥션 풀 크기를 환경별로 분리",
+      "url": "https://github.com/acme/api-gateway/pull/151",
+      "author": "hubot",
+      "updated": "2026-08-06T23:12:29Z",
+      "threads": [
+        {
+          "path": "src/pool/config.ts",
+          "resolved": false,
+          "myPoint": "기본값을 8로 두면 스테이징에서 커넥션이 남지 않을 것 같은데, 근거가 있을까요?",
+          "replyBy": "hubot",
+          "replyAt": "2026-08-06T23:12:29Z",
+          "reply": "부하 테스트에서 6까지 쓰는 걸 확인해서 여유를 둔 값입니다. 스테이징은 4로 낮추겠습니다.",
+          "link": "https://github.com/acme/api-gateway/pull/151#discussion_r1"
+        }
+      ]
+    },
+    {
+      "repo": "acme/design-system",
+      "num": 74,
+      "title": "Fix: Select 키보드 탐색이 그룹 헤더에서 멈추던 문제",
+      "url": "https://github.com/acme/design-system/pull/74",
+      "author": "monalisa",
+      "updated": "2026-08-05T08:48:29Z",
+      "threads": [
+        {
+          "path": "src/Select/useKeyboard.ts",
+          "resolved": false,
+          "myPoint": "헤더를 건너뛰는 대신 aria-disabled 를 주는 편이 스크린리더에 낫지 않을까요?",
+          "replyBy": "monalisa",
+          "replyAt": "2026-08-05T08:48:29Z",
+          "reply": "그렇게 하면 NVDA 에서 항목 수가 어긋나더라고요. 일단 건너뛰기로 두고 별도 이슈로 남기겠습니다.",
+          "link": "https://github.com/acme/design-system/pull/74#discussion_r2"
+        }
+      ]
+    }
+  ],
+  "reviewedClosed": [
+    {
+      "repo": "acme/acme-web",
+      "num": 398,
+      "title": "Feat: 쿠폰 적용 화면 개편",
+      "url": "https://github.com/acme/acme-web/pull/398",
+      "threads": [
+        {},
+        {}
+      ]
+    },
+    {
+      "repo": "acme/api-gateway",
+      "num": 142,
+      "title": "Fix: 헬스체크 타임아웃 상향",
+      "url": "https://github.com/acme/api-gateway/pull/142",
+      "threads": [
+        {}
+      ]
+    },
+    {
+      "repo": "acme/design-system",
+      "num": 70,
+      "title": "Docs: 토큰 명명 규칙 정리",
+      "url": "https://github.com/acme/design-system/pull/70",
+      "threads": [
+        {}
+      ]
+    },
+    {
+      "repo": "acme/acme-web",
+      "num": 389,
+      "title": "Refactor: 라우터 가드 정리",
+      "url": "https://github.com/acme/acme-web/pull/389",
+      "threads": [
+        {},
+        {},
+        {}
+      ]
+    }
+  ],
+  "config": {
+    "names": {
+      "monalisa": "Mona Lisa",
+      "hubot": "Hubot",
+      "octocat": "나"
+    },
+    "displayName": "Octocat",
+    "reminderCc": "@monalisa @hubot",
+    "excludeNote": "octocat"
+  }
+};
+  const SNAPSHOT = DATA.generatedAt;
+
+  // 표시 이름 매핑은 설정 파일에서 온다. 비어 있으면 GitHub 로그인을 그대로 쓴다.
+  const CONFIG = DATA.config || {};
+  const NAMES = CONFIG.names || {};
+  const who = login => NAMES[login] || login;
+
+  const mine = DATA.mine.filter(p => p.approvals.length === 0
+    && !p.pendingReply && p.unresolvedThreads.length === 0);
+
+  const needReply = DATA.mine.filter(p => p.pendingReply || p.unresolvedThreads.length > 0);
+
+  const readyToMerge = DATA.mine.filter(p => p.approvals.length > 0);
+
+  const reviewed = DATA.reviewedOpen.map(p => ({ ...p, author: who(p.author) }));
+
+  const archive = DATA.reviewedClosed.map(p => ({
+    repo: p.repo, num: p.num, title: p.title, url: p.url, threads: p.threads.length
+  }));
+
+  const DAY = 86400000;
+  const now = Date.now();
+  const days = iso => (now - new Date(iso).getTime()) / DAY;
+
+  const fmtAge = d =>
+    d < 1 / 24 ? "방금" :
+    d < 1 ? Math.round(d * 24) + "시간 대기" :
+    d.toFixed(1) + "일 대기";
+
+  // 대기 5일 이상은 로즈, 3일 이상은 앰버, 그 아래는 조용한 중성색.
+  const toneFor = d =>
+    d >= 5 ? ["var(--reply)", "var(--reply-soft)"] :
+    d >= 3 ? ["var(--wait)", "var(--wait-soft)"] :
+             ["var(--muted)", "var(--surface-2)"];
+
+  // GitHub 코멘트 원문의 마크다운 기호를 걷어내고 한 줄로 만든다.
+  const plain = t => (t || "")
+    .replace(/```[a-z]*/gi, " ")
+    .replace(/\*\*(.+?)\*\*/g, "$1")
+    .replace(/`([^`]+)`/g, "$1")
+    .replace(/^\s*[-*]\s+/gm, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+
+  // file:// 로 열면 navigator.clipboard 가 막히므로 execCommand 로 물러선다.
+  async function copyText(text) {
+    try {
+      if (navigator.clipboard && window.isSecureContext) {
+        await navigator.clipboard.writeText(text);
+        return true;
+      }
+    } catch (e) { /* 폴백으로 내려간다 */ }
+    try {
+      const ta = document.createElement("textarea");
+      ta.value = text;
+      ta.setAttribute("readonly", "");
+      ta.style.cssText = "position:fixed;top:0;left:-9999px;opacity:0";
+      document.body.appendChild(ta);
+      ta.select();
+      const ok = document.execCommand("copy");
+      ta.remove();
+      return ok;
+    } catch (e) {
+      return false;
+    }
+  }
+
+  function copyButton(label, getText) {
+    const b = el("button", "copy", label);
+    b.type = "button";
+    b.addEventListener("click", async ev => {
+      ev.preventDefault();
+      ev.stopPropagation();
+      const ok = await copyText(getText());
+      b.textContent = ok ? "복사됨" : "복사 실패";
+      b.dataset[ok ? "done" : "failed"] = "1";
+      setTimeout(() => {
+        b.textContent = label;
+        delete b.dataset.done;
+        delete b.dataset.failed;
+      }, 1600);
+    });
+    return b;
+  }
+
+  // 레포 이름은 슬랙에서 소유자 없이 쓴다 (acme/acme-web → acme-web).
+  const shortRepo = r => r.split("/").pop();
+
+  // 평소 슬랙에 올리는 모양: "설명 PR 입니다" + 링크
+  const oneLine = pr => pr.title + " PR 입니다\n" + pr.url;
+
+  // 여러 건 리마인드: 레포별로 묶고 끝에 cc 를 붙인다.
+  function reminderText(list, lead) {
+    const groups = new Map();
+    list.forEach(pr => {
+      const k = shortRepo(pr.repo);
+      if (!groups.has(k)) groups.set(k, []);
+      groups.get(k).push(pr);
+    });
+    const body = [...groups.entries()]
+      .map(([repo, prs]) =>
+        "*" + repo + "*\n" + prs.map(p => "• " + p.title + " " + p.url).join("\n"))
+      .join("\n\n");
+    // 리마인드 끝에 붙일 멘션도 설정에서 온다. 없으면 붙이지 않는다.
+    const cc = CONFIG.reminderCc ? "\n\ncc " + CONFIG.reminderCc : "";
+    return lead + "\n\n" + body + cc;
+  }
+
+  const el = (tag, cls, text) => {
+    const n = document.createElement(tag);
+    if (cls) n.className = cls;
+    if (text != null) n.textContent = text;
+    return n;
+  };
+
+  function prRow(pr, opts = {}) {
+    const d = days(pr.created || pr.replyAt);
+    const [tone, soft] = opts.tone ? opts.tone : toneFor(d);
+    const row = el("div", "row");
+    row.style.setProperty("--tone", tone);
+    row.style.setProperty("--tone-soft", soft);
+
+    const main = el("div");
+    const meta = el("div", "meta");
+    meta.append(el("span", "repo", pr.repo), el("span", "num", "#" + pr.num));
+    if (pr.author) meta.append(el("span", "author", "작성자 " + pr.author));
+    if (opts.pill) {
+      const p = el("span", "pill", opts.pill);
+      p.style.setProperty("--tone", tone);
+      p.style.setProperty("--tone-soft", soft);
+      meta.append(p);
+    }
+    const a = el("a", "title", pr.title);
+    a.href = pr.url;
+    a.target = "_blank";
+    a.rel = "noopener";
+    main.append(meta, a);
+
+    const age = el("div", "age");
+    age.append(el("span", "val", opts.ageFmt ? opts.ageFmt(d) : fmtAge(d)));
+    const bar = el("div", "bar");
+    const fill = el("i");
+    fill.style.width = Math.max(4, Math.min(100, (d / 7) * 100)) + "%";
+    bar.append(fill);
+    age.append(bar);
+
+    row.append(main, age, copyButton("복사", () => oneLine(pr)));
+
+    (pr.threads || []).forEach(t => {
+      const th = el("div", "thread");
+      if (t.path) th.append(el("div", "path", t.path));
+      const t1 = el("div", "turn mine");
+      t1.append(el("span", "by", "나"), el("p", null, plain(t.myPoint)));
+      const t2 = el("div", "turn theirs");
+      t2.append(el("span", "by", who(t.replyBy)), el("p", null, plain(t.reply)));
+      th.append(t1, t2);
+      row.append(th);
+    });
+
+    if (pr.pendingReply) {
+      const th = el("div", "thread");
+      const t = el("div", "turn theirs");
+      t.append(el("span", "by", who(pr.pendingReply.by)),
+               el("p", null, plain(pr.pendingReply.snippet)));
+      th.append(t);
+      row.append(th);
+    }
+    return row;
+  }
+
+  function fill(id, list, opts, emptyMsg) {
+    const box = document.getElementById(id);
+    if (!list.length) {
+      box.append(el("div", "empty", emptyMsg));
+      return;
+    }
+    list.forEach(pr => box.append(prRow(pr, opts)));
+  }
+
+  const byAge = (a, b) => new Date(a.created) - new Date(b.created);
+
+  // 섹션 헤더에 "여러 건을 한 메시지로" 복사하는 버튼을 단다.
+  function headCopy(secId, label, getText, enabled) {
+    if (!enabled) return;
+    document.getElementById(secId).append(copyButton(label, getText));
+  }
+
+  fill("wait", [...mine].sort(byAge), {}, "리뷰 대기 중인 PR이 없습니다.");
+  fill("reply", needReply, { tone: ["var(--reply)", "var(--reply-soft)"], pill: "답변 필요" },
+       "답변을 기다리는 코멘트가 없습니다.");
+  fill("ready", readyToMerge, { tone: ["var(--ready)", "var(--ready-soft)"], pill: "머지 가능" },
+       "승인받고 남아 있는 PR이 없습니다.");
+  reviewed.forEach(p => { p.created = p.threads[0] && p.threads[0].replyAt; });
+  fill("rev", reviewed, { tone: ["var(--reply)", "var(--reply-soft)"], pill: "확인 필요",
+         ageFmt: d => d < 1 ? "오늘 답글" : Math.round(d) + "일 전 답글" },
+       "내 리뷰에 달린 미확인 답글이 없습니다.");
+
+  const waitSorted = [...mine].sort(byAge);
+  headCopy("h-wait", "슬랙 리마인드 복사",
+    () => reminderText(waitSorted, "올린 PR 중 아직 리뷰 전인 건들입니다. 확인 한번 부탁 드립니다."),
+    waitSorted.length > 0);
+
+  headCopy("h-ready", "슬랙 문구 복사",
+    () => reminderText(readyToMerge, "아래 PR 승인 감사합니다. 머지하겠습니다."),
+    readyToMerge.length > 0);
+
+  const arc = document.getElementById("arc");
+  archive.forEach(x => {
+    const a = document.createElement("a");
+    a.href = x.url;
+    a.target = "_blank";
+    a.rel = "noopener";
+    a.append(el("span", "n", "#" + x.num), el("span", "t", x.title));
+    if (x.threads > 1) a.append(el("span", "c", x.threads + "건"));
+    arc.append(a);
+  });
+
+  const allMine = DATA.mine;
+  const oldest = allMine.length ? Math.max(...allMine.map(p => days(p.created))) : 0;
+  const stale = mine.filter(p => days(p.created) >= 3).length;
+
+  const tiles = [
+    { label: "리뷰 대기", n: mine.length, unit: "건",
+      note: stale ? stale + "건이 3일 이상 대기" : "모두 오늘 올린 PR",
+      tone: stale ? "var(--wait)" : "var(--muted)" },
+    { label: "응답 필요", n: needReply.length, unit: "건",
+      note: needReply.length ? "코멘트에 답변 대기 중" : "밀린 답변 없음",
+      tone: needReply.length ? "var(--reply)" : "var(--ready)" },
+    { label: "머지 대기", n: readyToMerge.length, unit: "건",
+      note: readyToMerge.length ? "승인 완료, 머지만 남음" : "승인 대기 중인 건만 남음",
+      tone: readyToMerge.length ? "var(--ready)" : "var(--muted)" },
+    { label: "내 리뷰 답글", n: reviewed.length, unit: "건",
+      note: reviewed.length ? "리뷰이 반론에 확인 필요" : "미확인 답글 없음",
+      tone: reviewed.length ? "var(--reply)" : "var(--muted)" }
+  ];
+
+  const tbox = document.getElementById("tiles");
+  tiles.forEach(t => {
+    const n = el("div", "tile");
+    n.style.setProperty("--tone", t.tone);
+    const fig = el("div", "figure", String(t.n));
+    fig.append(el("span", "unit", t.unit));
+    n.append(el("div", "label", t.label), fig, el("div", "note", t.note));
+    tbox.append(n);
+  });
+
+  document.getElementById("c-wait").textContent = mine.length;
+  document.getElementById("c-reply").textContent = needReply.length;
+  document.getElementById("c-ready").textContent = readyToMerge.length;
+  document.getElementById("c-rev").textContent = reviewed.length;
+  document.getElementById("c-arc").textContent = archive.length;
+
+  // 제목의 이름과 푸터의 제외 안내는 설정이 있을 때만 나온다.
+  document.getElementById("owner").textContent =
+    CONFIG.displayName ? CONFIG.displayName + " " : "";
+  // 소유자 이름이 어떤 글자로 끝나든 어색하지 않도록 조사를 붙이지 않는다.
+  document.getElementById("excluded").textContent =
+    (CONFIG.excludeNote ? "제외한 소유자: " + CONFIG.excludeNote + " · " : "")
+    + "봇 코멘트는 집계에서 제외했습니다.";
+
+  const snap = new Date(SNAPSHOT);
+  const kst = new Intl.DateTimeFormat("ko-KR", {
+    timeZone: "Asia/Seoul", dateStyle: "medium", timeStyle: "short"
+  }).format(snap);
+  const mins = Math.round((DATA.closedAgeSec || 0) / 60);
+  document.getElementById("freshness").textContent =
+    "열린 PR 은 이 페이지를 연 시점에 수집했고, 머지된 PR 답글은 "
+    + (mins < 1 ? "방금" : mins + "분 전") + " 수집한 캐시입니다.";
+
+  document.getElementById("stamp").textContent =
+    "기준 " + kst + " KST · 최장 대기 " + oldest.toFixed(1) + "일";
+</script>

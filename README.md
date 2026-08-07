@@ -6,6 +6,13 @@ GitHub 알림함은 읽은 것과 안 읽은 것으로만 나뉘지만, 실제�
 `gh` CLI 위에서 도는 셸 스크립트 세 개와 정적 HTML 하나가 전부입니다. 서버에 데이터를 보내지 않고,
 토큰을 따로 저장하지도 않습니다.
 
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="docs/pr-dashboard-dark.png">
+  <img alt="PR 현황 보드 — 리뷰 대기, 응답 필요, 머지 대기, 내 리뷰 답글 네 구획으로 나뉜 대시보드" src="docs/pr-dashboard-light.png">
+</picture>
+
+<sub>스크린샷은 가짜 데이터입니다. `docs/demo.html` 을 열면 같은 화면을 직접 볼 수 있습니다.</sub>
+
 ## 무엇을 보여주나
 
 | 구획 | 기준 |

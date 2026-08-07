@@ -864,9 +864,10 @@
   // 제목의 이름과 푸터의 제외 안내는 설정이 있을 때만 나온다.
   document.getElementById("owner").textContent =
     CONFIG.displayName ? CONFIG.displayName + " " : "";
+  // 소유자 이름이 어떤 글자로 끝나든 어색하지 않도록 조사를 붙이지 않는다.
   document.getElementById("excluded").textContent =
-    (CONFIG.excludeNote ? "레포 " + CONFIG.excludeNote + " 와 봇" : "봇")
-    + " 코멘트는 집계에서 제외했습니다.";
+    (CONFIG.excludeNote ? "제외한 소유자: " + CONFIG.excludeNote + " · " : "")
+    + "봇 코멘트는 집계에서 제외했습니다.";
 
   const snap = new Date(SNAPSHOT);
   const kst = new Intl.DateTimeFormat("ko-KR", {

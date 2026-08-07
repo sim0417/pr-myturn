@@ -1,0 +1,17 @@
+{
+  "displayName": "",
+
+  "names": {
+    "octocat": "Octo Cat"
+  },
+
+  "excludeOwners": [],
+
+  "bots": ["github-actions", "dependabot", "codecov", "renovate"],
+
+  "reminderCc": "",
+
+  "closedWithinDays": 30,
+
+  "approvalWindowSec": 600
+}

@@ -9,7 +9,7 @@
 set -euo pipefail
 
 HERE="$(cd -P "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-LABEL="com.gh-pr-dashboard.menubar"
+LABEL="com.pr-myturn.menubar"
 PLIST="$HOME/Library/LaunchAgents/$LABEL.plist"
 VENV="$HERE/.venv"
 LOG="$HOME/Library/Logs/pr-menubar.log"

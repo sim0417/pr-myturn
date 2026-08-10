@@ -1,4 +1,4 @@
-# gh-pr-dashboard
+# pr-myturn
 
 내가 올린 PR과 내가 리뷰한 PR 중 **지금 내 차례인 것**만 골라 보여주는 로컬 대시보드입니다.
 GitHub 알림함은 읽은 것과 안 읽은 것으로만 나뉘지만, 실제로 알고 싶은 건 "누가 나를 기다리고 있나"입니다.
@@ -37,8 +37,8 @@ GitHub 알림함은 읽은 것과 안 읽은 것으로만 나뉘지만, 실제�
 ## 설치
 
 ```sh
-git clone https://github.com/<you>/gh-pr-dashboard.git
-cd gh-pr-dashboard
+git clone https://github.com/<you>/pr-myturn.git
+cd pr-myturn
 ./bin/pr-dashboard.sh
 ```
 

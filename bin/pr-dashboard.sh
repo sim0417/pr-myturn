@@ -15,6 +15,11 @@
 # CLOSED_TTL 초 동안 캐시를 재사용한다.
 set -euo pipefail
 
+# 캐시에는 비공개 레포의 PR 제목과 리뷰 코멘트 원문이 그대로 담긴다. macOS 홈은
+# 그룹(staff)에 읽기 권한이 있어서, 기본 umask 로 두면 같은 머신의 다른 계정이
+# 읽을 수 있다. 이 스크립트가 만드는 것은 전부 소유자 전용으로 떨어뜨린다.
+umask 077
+
 # 심볼릭 링크로 걸어 써도 lib 를 찾도록 실제 경로를 푼다.
 SELF="${BASH_SOURCE[0]}"
 while [ -L "$SELF" ]; do
@@ -55,6 +60,9 @@ PIDFILE="$CACHE/server.pid"
 server_up() { lsof -nP -iTCP:"$PORT" -sTCP:LISTEN -t >/dev/null 2>&1; }
 
 mkdir -p "$CACHE"
+# umask 는 앞으로 만들 것만 다스린다. 예전 버전이 644 로 남긴 것도 거둬들인다.
+chmod 700 "$CACHE" 2>/dev/null || true
+find "$CACHE" -maxdepth 1 -type f -exec chmod 600 {} + 2>/dev/null || true
 
 if [ "$DO_STOP" = true ]; then
   if [ -f "$PIDFILE" ] && kill "$(cat "$PIDFILE")" 2>/dev/null; then

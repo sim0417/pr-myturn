@@ -5,3 +5,6 @@ config.json
 # 메뉴바 앱 가상환경
 contrib/menubar/.venv/
 __pycache__/
+
+# 보안 감사 리포트는 로컬에만 둔다
+.gstack/

@@ -65,7 +65,11 @@ pr-dashboard.sh --stop     백그라운드 서버 종료
 ```sh
 mkdir -p ~/.config/pr-dashboard
 cp config.example.json ~/.config/pr-dashboard/config.json
+chmod 600 ~/.config/pr-dashboard/config.json
 ```
+
+`chmod` 를 빼먹지 마세요. macOS 홈 디렉터리는 그룹(`staff`)에 읽기 권한이 있어서,
+기본 권한으로 두면 같은 머신의 다른 계정이 팀원 실명 매핑을 읽을 수 있습니다.
 
 | 키 | 뜻 | 기본값 |
 |---|---|---|
@@ -118,6 +122,10 @@ macOS 는 GUI 세션에 속한 프로세스만 상태 아이템을 그리기 때
 ## 데이터와 보안
 
 - 수집한 데이터는 `~/.cache/pr-dashboard/` 아래에만 남습니다. 외부로 나가지 않습니다.
+  캐시 디렉터리는 `700`, 그 안의 파일은 `600` 으로 만듭니다. PR 제목과 코멘트 원문이
+  담기는 곳이라 같은 머신의 다른 계정에게도 보이지 않아야 합니다.
+- 메뉴바 앱의 의존성은 `contrib/menubar/requirements.txt` 에 버전을 고정했습니다.
+  launchd 로 상시 실행되는 코드라 매번 최신을 받아오지 않습니다.
 - 인증은 전적으로 `gh` CLI에 맡깁니다. 이 저장소의 코드는 토큰을 읽거나 저장하지 않습니다.
 - 로컬 서버는 `127.0.0.1` 에만 바인딩하고 `Host` 헤더를 검사합니다. 악성 페이지가 DNS
   rebinding으로 대시보드 내용을 읽어가는 경로를 막기 위한 것입니다.

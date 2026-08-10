@@ -29,7 +29,7 @@ if [ ! -x "$VENV/bin/python" ]; then
   echo "가상환경을 만듭니다..."
   python3 -m venv "$VENV"
 fi
-"$VENV/bin/pip" install -q --disable-pip-version-check --upgrade rumps
+"$VENV/bin/pip" install -q --disable-pip-version-check -r "$HERE/requirements.txt"
 
 mkdir -p "$HOME/Library/LaunchAgents" "$HOME/Library/Logs"
 cat > "$PLIST" <<EOF

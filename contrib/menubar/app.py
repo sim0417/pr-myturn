@@ -13,9 +13,11 @@ import json
 import os
 import pathlib
 import subprocess
+import threading
 import time
 
 import rumps
+from PyObjCTools import AppHelper
 
 from window import DashboardWindow
 
@@ -68,29 +70,49 @@ class Dashboard(rumps.App):
         self.error = None
         self.fetched_at = None
         self.last_pending = None      # 알림은 "늘어났을 때"만 띄우기 위한 직전 값
+        self.collecting = False
+        self.building = False
         self.window = DashboardWindow()
         self.timer = rumps.Timer(self.tick, self.poll_sec)
         self.timer.start()
         self.tick(None)
 
     # 수집 --------------------------------------------------------------
+    #
+    # rumps 의 타이머와 메뉴 콜백은 UI 스레드에서 돈다. 여기서 수집을 기다리면
+    # 그 몇 초 동안 메뉴바가 통째로 얼어붙고 창도 뜨지 못한다. 수집은 항상
+    # 별도 스레드에서 하고, 화면을 건드리는 일만 메인 스레드로 되돌린다.
 
     def tick(self, _):
+        if self.collecting:
+            return          # 앞선 수집이 아직이면 겹쳐 부르지 않는다
+        self.collecting = True
+        threading.Thread(target=self._collect, daemon=True).start()
+
+    def _collect(self):
         try:
             out = subprocess.run(
                 [str(STATUS), "--json"], env=ENV, capture_output=True,
                 text=True, timeout=60, check=True).stdout
-            self.prs = json.loads(out)
-            self.error = None
-            self.write_status()
+            prs, error = json.loads(out), None
         except subprocess.CalledProcessError as e:
-            self.error = (e.stderr or "").strip().splitlines()[-1:] or ["수집 실패"]
-            self.error = self.error[0][:80]
+            prs = None
+            tail = (e.stderr or "").strip().splitlines()[-1:]
+            error = (tail[0] if tail else "수집 실패")[:80]
         except subprocess.TimeoutExpired:
-            self.error = "수집이 60초를 넘어 중단했습니다"
+            prs, error = None, "수집이 60초를 넘어 중단했습니다"
         except (OSError, ValueError) as e:
-            self.error = str(e)[:80]
+            prs, error = None, str(e)[:80]
 
+        AppHelper.callAfter(self._collected, prs, error)
+
+    def _collected(self, prs, error):
+        """메인 스레드. 여기서만 상태와 화면을 만진다."""
+        self.collecting = False
+        self.error = error
+        if prs is not None:
+            self.prs = prs
+            self.write_status()
         self.fetched_at = time.localtime()
         self.render()
 
@@ -203,23 +225,36 @@ class Dashboard(rumps.App):
         subprocess.run(["open", sender.pr_url], env=ENV)
 
     def open_dashboard(self, _):
-        """수집해서 HTML 을 갱신한 뒤 앱 창에 띄운다.
+        """있는 화면을 바로 띄우고, 갱신은 뒤에서 한다.
 
-        수집은 리뷰 답글까지 훑느라 몇 초 걸리므로 창을 먼저 띄우고 싶지만,
-        그러면 옛 화면이 잠깐 보였다가 바뀐다. 짧은 대기가 덜 거슬린다.
+        수집을 기다렸다 띄우면 5초쯤 아무 일도 일어나지 않는 것처럼 보인다.
+        먼저 보여주고 새 데이터가 오면 바꾸는 편이 훨씬 빠르게 느껴진다.
         """
+        if DASHBOARD_HTML.is_file():
+            self.window.show(DASHBOARD_HTML)
+        if not self.building:
+            self.building = True
+            threading.Thread(target=self._rebuild_dashboard, daemon=True).start()
+
+    def _rebuild_dashboard(self):
+        ok = True
         try:
             # 출력을 버리지 않는다. 실패하면 launchd 로그에 남아야 한다.
             subprocess.run([str(DASHBOARD), "--no-open"], env=ENV,
-                           timeout=120, check=True)
+                           timeout=180, check=True)
         except (subprocess.CalledProcessError, subprocess.TimeoutExpired) as e:
-            # 수집이 어긋나도 직전 화면은 보여준다. 아무것도 안 뜨는 것보다 낫다.
-            print(f"대시보드 갱신 실패, 이전 화면을 띄웁니다: {e}", flush=True)
+            ok = False
+            print(f"대시보드 갱신 실패: {e}", flush=True)
+        AppHelper.callAfter(self._rebuilt, ok)
 
-        try:
-            self.window.show(DASHBOARD_HTML)
-        except FileNotFoundError:
-            notify("대시보드를 열 수 없습니다", "수집이 한 번도 끝나지 않았습니다")
+    def _rebuilt(self, ok):
+        """메인 스레드. 갱신된 파일로 창을 다시 읽는다."""
+        self.building = False
+        if not DASHBOARD_HTML.is_file():
+            notify("대시보드를 열 수 없습니다",
+                   "수집이 한 번도 끝나지 않았습니다" if ok else "수집에 실패했습니다")
+            return
+        self.window.show(DASHBOARD_HTML)
 
 
 def hide_dock_icon():

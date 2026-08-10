@@ -13,5 +13,7 @@
 
   "closedWithinDays": 30,
 
-  "approvalWindowSec": 600
+  "approvalWindowSec": 600,
+
+  "menubarPollSec": 300
 }

@@ -82,6 +82,39 @@ cp config.example.json ~/.config/pr-dashboard/config.json
 
 `PR_DASHBOARD_CONFIG` 로 경로를 직접 지정할 수도 있습니다.
 
+## 메뉴바 앱 (선택)
+
+대시보드의 한계는 **내가 열어봐야 안다**는 점입니다. `contrib/menubar` 는 지금 내 차례인
+건수를 메뉴바에 상시로 띄웁니다.
+
+```sh
+./contrib/menubar/install.sh
+```
+
+`gh`, `jq`, `python3` 만 있으면 됩니다. 전용 가상환경에 [rumps](https://github.com/jaredks/rumps)
+를 받고 launchd 에 등록해 로그인할 때마다 뜹니다.
+
+```
+PR 6          ← 답변 필요 + 머지 가능 건수
+  답변 필요 1건
+      acme-web#405  Fix: 장바구니 수량 변경 시 합계가…
+  머지 가능 5건
+      ...
+  대시보드 열기 / 지금 새로고침
+```
+
+- 배지는 **답변 필요 + 머지 가능**입니다. 리뷰 대기는 상대 차례이므로 빼고 메뉴에서만 보여줍니다.
+- 항목을 누르면 그 PR 이 열립니다.
+- 답변 필요가 **늘어난 순간에만** 알림을 띄웁니다. 같은 건으로 반복해 알리지 않습니다.
+- 기본 5분 간격입니다. `config.json` 의 `menubarPollSec` 으로 바꿉니다.
+- 수집은 `bin/pr-status.sh` 를 그대로 호출하므로 판정이 대시보드와 어긋나지 않습니다.
+
+제거는 `./contrib/menubar/install.sh --uninstall` 입니다.
+
+터미널에서 `python3 app.py` 로 직접 실행하면 프로세스는 뜨지만 **메뉴바에는 나타나지 않습니다.**
+macOS 는 GUI 세션에 속한 프로세스만 상태 아이템을 그리기 때문이며, `install.sh` 가 launchd 에
+등록하는 이유입니다. 첫 알림에서 macOS 가 권한을 물을 수 있습니다.
+
 ## 데이터와 보안
 
 - 수집한 데이터는 `~/.cache/pr-dashboard/` 아래에만 남습니다. 외부로 나가지 않습니다.

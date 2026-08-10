@@ -4,3 +4,7 @@
 # 사용자 권한으로 상시 실행된다. 매번 최신을 받아오면 업스트림에 문제가
 # 생긴 날 그대로 물려받는다. 올릴 때는 릴리스 노트를 보고 손으로 올린다.
 rumps==0.4.0
+
+# 대시보드를 앱 창(WKWebView)에 띄우는 데 쓴다. rumps 가 끌고 오는
+# pyobjc-framework-Cocoa 와 같은 계열이라 버전을 맞춰 둔다.
+pyobjc-framework-WebKit==12.2.1

@@ -17,6 +17,8 @@ import time
 
 import rumps
 
+from window import DashboardWindow
+
 REPO = pathlib.Path(__file__).resolve().parents[2]
 STATUS = REPO / "bin" / "pr-status.sh"
 DASHBOARD = REPO / "bin" / "pr-dashboard.sh"
@@ -27,6 +29,7 @@ CACHE = pathlib.Path(
     os.environ.get("PR_MYTURN_CACHE")
     or pathlib.Path(os.environ.get("XDG_CACHE_HOME", pathlib.Path.home() / ".cache")) / "pr-myturn")
 STATUS_JSON = CACHE / "status.json"
+DASHBOARD_HTML = CACHE / "dashboard.html"
 
 # GUI 로 띄우면 로그인 셸의 PATH 를 물려받지 못해 gh 나 jq 를 찾지 못한다.
 # /usr/sbin 도 넣는다. lsof 같은 도구가 거기 있고, 빠지면 하위 스크립트가
@@ -65,6 +68,7 @@ class Dashboard(rumps.App):
         self.error = None
         self.fetched_at = None
         self.last_pending = None      # 알림은 "늘어났을 때"만 띄우기 위한 직전 값
+        self.window = DashboardWindow()
         self.timer = rumps.Timer(self.tick, self.poll_sec)
         self.timer.start()
         self.tick(None)
@@ -199,10 +203,23 @@ class Dashboard(rumps.App):
         subprocess.run(["open", sender.pr_url], env=ENV)
 
     def open_dashboard(self, _):
-        # 출력을 버리지 않는다. launchd 가 잡아 로그 파일에 남긴다. 예전에 여기서
-        # 출력을 DEVNULL 로 보내는 바람에, 대시보드가 뜨지 않는 이유가 로그 어디에도
-        # 남지 않았다.
-        subprocess.Popen([str(DASHBOARD)], env=ENV)
+        """수집해서 HTML 을 갱신한 뒤 앱 창에 띄운다.
+
+        수집은 리뷰 답글까지 훑느라 몇 초 걸리므로 창을 먼저 띄우고 싶지만,
+        그러면 옛 화면이 잠깐 보였다가 바뀐다. 짧은 대기가 덜 거슬린다.
+        """
+        try:
+            # 출력을 버리지 않는다. 실패하면 launchd 로그에 남아야 한다.
+            subprocess.run([str(DASHBOARD), "--no-open"], env=ENV,
+                           timeout=120, check=True)
+        except (subprocess.CalledProcessError, subprocess.TimeoutExpired) as e:
+            # 수집이 어긋나도 직전 화면은 보여준다. 아무것도 안 뜨는 것보다 낫다.
+            print(f"대시보드 갱신 실패, 이전 화면을 띄웁니다: {e}", flush=True)
+
+        try:
+            self.window.show(DASHBOARD_HTML)
+        except FileNotFoundError:
+            notify("대시보드를 열 수 없습니다", "수집이 한 번도 끝나지 않았습니다")
 
 
 def hide_dock_icon():

@@ -142,6 +142,23 @@
     gap: 8px;
   }
 
+  /* 앱 창에서만 보인다. 브라우저로 같은 파일을 열면 눌러도 할 일이 없어 숨긴다. */
+  .stamp #refresh {
+    font: inherit;
+    color: var(--ink-2);
+    background: var(--surface-2);
+    border: 1px solid var(--line);
+    border-radius: var(--radius);
+    padding: 3px 10px;
+    margin-left: 4px;
+    cursor: pointer;
+    transition: background 120ms ease, color 120ms ease;
+  }
+
+  .stamp #refresh:hover { background: var(--surface); color: var(--ink); }
+
+  .stamp #refresh[disabled] { opacity: .55; cursor: default; }
+
   .stamp .dot {
     width: 6px;
     height: 6px;
@@ -550,7 +567,10 @@
 <div class="wrap">
   <header class="masthead">
     <h1><span class="who" id="owner"></span>PR 현황 보드</h1>
-    <div class="stamp"><span class="dot"></span><span id="stamp"></span></div>
+    <div class="stamp">
+      <span class="dot"></span><span id="stamp"></span>
+      <button type="button" id="refresh" hidden>새로고침</button>
+    </div>
   </header>
 
   <div class="tiles" id="tiles"></div>
@@ -878,6 +898,30 @@
   document.getElementById("excluded").textContent =
     (CONFIG.excludeNote ? "제외한 소유자: " + CONFIG.excludeNote + " · " : "")
     + "봇 코멘트는 집계에서 제외했습니다.";
+
+  // 앱 창 안에서만 새로고침을 걸 수 있다. 브라우저에는 이 다리가 없으므로
+  // 버튼을 숨긴 채로 둔다. 눌리지 않는 버튼을 보여주는 것보다 낫다.
+  const native = window.webkit
+    && window.webkit.messageHandlers
+    && window.webkit.messageHandlers.prMyturn;
+
+  if (native) {
+    const btn = document.getElementById("refresh");
+    const ask = () => {
+      if (btn.disabled) return;
+      btn.disabled = true;
+      btn.textContent = "갱신 중";
+      native.postMessage("refresh");   // 끝나면 앱이 이 페이지를 다시 읽는다
+    };
+    btn.hidden = false;
+    btn.addEventListener("click", ask);
+    document.addEventListener("keydown", e => {
+      if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === "r") {
+        e.preventDefault();
+        ask();
+      }
+    });
+  }
 
   const snap = new Date(SNAPSHOT);
   const kst = new Intl.DateTimeFormat("ko-KR", {

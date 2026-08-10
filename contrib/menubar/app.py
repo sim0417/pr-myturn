@@ -72,7 +72,7 @@ class Dashboard(rumps.App):
         self.last_pending = None      # 알림은 "늘어났을 때"만 띄우기 위한 직전 값
         self.collecting = False
         self.building = False
-        self.window = DashboardWindow()
+        self.window = DashboardWindow(on_refresh=self.refresh_dashboard)
         self.timer = rumps.Timer(self.tick, self.poll_sec)
         self.timer.start()
         self.tick(None)
@@ -232,15 +232,24 @@ class Dashboard(rumps.App):
         """
         if DASHBOARD_HTML.is_file():
             self.window.show(DASHBOARD_HTML)
-        if not self.building:
-            self.building = True
-            threading.Thread(target=self._rebuild_dashboard, daemon=True).start()
+        self.refresh_dashboard()
+
+    def refresh_dashboard(self):
+        """페이지의 새로고침 버튼과 대시보드 열기가 함께 쓰는 입구."""
+        if self.building:
+            return          # 이미 돌고 있으면 두 번 걸지 않는다
+        self.building = True
+        threading.Thread(target=self._rebuild_dashboard, daemon=True).start()
 
     def _rebuild_dashboard(self):
         ok = True
         try:
+            # OPEN_TTL 을 0 으로 눌러 캐시를 건너뛴다. 사람이 새로고침을 눌렀는데
+            # "60초 안에 받은 게 있으니 그대로" 라고 답하면 고장으로 보인다.
+            # 연타는 building 플래그가 막으므로 쿼터가 새지 않는다.
             # 출력을 버리지 않는다. 실패하면 launchd 로그에 남아야 한다.
-            subprocess.run([str(DASHBOARD), "--no-open"], env=ENV,
+            subprocess.run([str(DASHBOARD), "--no-open"],
+                           env={**ENV, "PR_DASHBOARD_OPEN_TTL": "0"},
                            timeout=180, check=True)
         except (subprocess.CalledProcessError, subprocess.TimeoutExpired) as e:
             ok = False

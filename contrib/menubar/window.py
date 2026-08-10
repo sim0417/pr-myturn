@@ -13,7 +13,7 @@ from AppKit import (NSApp, NSBackingStoreBuffered, NSMakeRect, NSObject,
                     NSScreen, NSWindow, NSWindowStyleMaskClosable,
                     NSWindowStyleMaskMiniaturizable, NSWindowStyleMaskResizable,
                     NSWindowStyleMaskTitled, NSWorkspace)
-from Foundation import NSURL, NSURLRequest
+from Foundation import NSURL
 from WebKit import WKWebView, WKWebViewConfiguration
 
 STYLE = (NSWindowStyleMaskTitled | NSWindowStyleMaskClosable
@@ -42,14 +42,35 @@ class NavigationDelegate(NSObject):
         handler(0)              # WKNavigationActionPolicyCancel
 
 
+class MessageHandler(NSObject):
+    """페이지에서 온 요청을 앱으로 넘긴다.
+
+    지금은 새로고침 하나뿐이다. 서버가 있던 시절에는 브라우저 새로고침이
+    곧 재수집이었는데, 서버를 걷어내면서 그 경로가 사라졌다. 창을 열어둔 채
+    최신 상태를 보려면 페이지가 앱에게 말을 걸 수 있어야 한다.
+    """
+
+    def initWithCallback_(self, callback):
+        self = objc.super(MessageHandler, self).init()
+        if self is None:
+            return None
+        self._callback = callback
+        return self
+
+    def userContentController_didReceiveScriptMessage_(self, _controller, message):
+        if message.body() == "refresh" and self._callback:
+            self._callback()
+
+
 class DashboardWindow:
     """하나만 만들어 두고 열고 닫는다. 매번 새로 만들면 위치를 잊는다."""
 
-    def __init__(self, title="PR 현황 보드"):
+    def __init__(self, title="PR 현황 보드", on_refresh=None):
         self._title = title
         self._window = None
         self._webview = None
         self._delegate = NavigationDelegate.alloc().init()
+        self._handler = MessageHandler.alloc().initWithCallback_(on_refresh)
 
     def _build(self):
         screen = NSScreen.mainScreen().visibleFrame()
@@ -64,8 +85,15 @@ class DashboardWindow:
         window.setMinSize_((MIN_WIDTH, MIN_HEIGHT))
         window.setReleasedWhenClosed_(False)   # 닫아도 파이썬 쪽에서 계속 들고 있는다
 
+        config = WKWebViewConfiguration.alloc().init()
+        # 페이지에서 window.webkit.messageHandlers.prMyturn 으로 부를 수 있게 한다.
+        # 브라우저로 같은 파일을 열면 이 객체가 없고, 페이지는 그때 새로고침
+        # 버튼을 감춘다. 죽은 버튼을 보여주지 않기 위해서다.
+        config.userContentController().addScriptMessageHandler_name_(
+            self._handler, "prMyturn")
+
         webview = WKWebView.alloc().initWithFrame_configuration_(
-            window.contentView().bounds(), WKWebViewConfiguration.alloc().init())
+            window.contentView().bounds(), config)
         webview.setAutoresizingMask_(2 | 16)   # 너비·높이 모두 따라 늘어난다
         webview.setNavigationDelegate_(self._delegate)
         window.contentView().addSubview_(webview)

@@ -555,7 +555,7 @@
     <div class="sec-head" id="h-wait">
       <h2>내 PR — 리뷰 대기</h2>
       <span class="count" id="c-wait"></span>
-      <span class="desc">승인 0건. 대기 일수 순</span>
+      <span class="desc">아직 승인 전. 상대 차례</span>
     </div>
     <div class="rows" id="wait"></div>
   </section>
@@ -564,16 +564,16 @@
     <div class="sec-head">
       <h2>내 PR — 응답 필요</h2>
       <span class="count" id="c-reply"></span>
-      <span class="desc">상대 코멘트에 내 답이 없는 건</span>
+      <span class="desc">변경 요청·미해결 스레드·미답변. 내 차례</span>
     </div>
     <div class="rows" id="reply"></div>
   </section>
 
   <section>
     <div class="sec-head" id="h-ready">
-      <h2>내 PR — 머지 대기</h2>
+      <h2>내 PR — 머지 가능</h2>
       <span class="count" id="c-ready"></span>
-      <span class="desc">승인받고 아직 머지하지 않은 건</span>
+      <span class="desc">승인 완료, 막힌 것 없음</span>
     </div>
     <div class="rows" id="ready"></div>
   </section>
@@ -616,12 +616,30 @@
   const NAMES = CONFIG.names || {};
   const who = login => NAMES[login] || login;
 
-  const mine = DATA.mine.filter(p => p.approvals.length === 0
-    && !p.pendingReply && p.unresolvedThreads.length === 0);
+  // 한 PR 은 한 구획에만 들어간다. 승인을 하나 받았어도 답할 것이 남아 있으면
+  // 그게 먼저다. 승인 개수를 세는 대신 GitHub 의 reviewDecision 을 쓴다.
+  // 브랜치 보호의 필요 승인 수까지 반영된 판정이라 "승인 1/2" 도 정확히 걸러진다.
+  const needsAction = p =>
+    p.reviewDecision === "CHANGES_REQUESTED"
+    || !!p.pendingReply
+    || p.unresolvedThreads.length > 0
+    || (p.reviewDecision === "APPROVED"
+        && (p.mergeState === "DIRTY" || p.mergeState === "BEHIND"));
 
-  const needReply = DATA.mine.filter(p => p.pendingReply || p.unresolvedThreads.length > 0);
+  // 배지에 쓸 사유. 손이 많이 가는 것부터 본다.
+  const actionReason = p =>
+    p.reviewDecision === "CHANGES_REQUESTED" ? "변경 요청" :
+    p.mergeState === "DIRTY" ? "충돌 해결" :
+    p.mergeState === "BEHIND" ? "브랜치 업데이트" :
+    p.pendingReply ? "답변 필요" : "미해결 스레드";
 
-  const readyToMerge = DATA.mine.filter(p => p.approvals.length > 0);
+  const needReply = DATA.mine.filter(needsAction);
+
+  const readyToMerge = DATA.mine.filter(p =>
+    !needsAction(p) && p.reviewDecision === "APPROVED");
+
+  const mine = DATA.mine.filter(p =>
+    !needsAction(p) && p.reviewDecision !== "APPROVED");
 
   const reviewed = DATA.reviewedOpen.map(p => ({ ...p, author: who(p.author) }));
 
@@ -736,7 +754,9 @@
     meta.append(el("span", "repo", pr.repo), el("span", "num", "#" + pr.num));
     if (pr.author) meta.append(el("span", "author", "작성자 " + pr.author));
     if (opts.pill) {
-      const p = el("span", "pill", opts.pill);
+      // 구획마다 고정 문구를 쓰기도 하고, PR 별로 사유를 계산하기도 한다.
+      const p = el("span", "pill",
+        typeof opts.pill === "function" ? opts.pill(pr) : opts.pill);
       p.style.setProperty("--tone", tone);
       p.style.setProperty("--tone-soft", soft);
       meta.append(p);
@@ -797,10 +817,10 @@
   }
 
   fill("wait", [...mine].sort(byAge), {}, "리뷰 대기 중인 PR이 없습니다.");
-  fill("reply", needReply, { tone: ["var(--reply)", "var(--reply-soft)"], pill: "답변 필요" },
-       "답변을 기다리는 코멘트가 없습니다.");
+  fill("reply", needReply, { tone: ["var(--reply)", "var(--reply-soft)"], pill: actionReason },
+       "내 차례인 PR이 없습니다.");
   fill("ready", readyToMerge, { tone: ["var(--ready)", "var(--ready-soft)"], pill: "머지 가능" },
-       "승인받고 남아 있는 PR이 없습니다.");
+       "머지를 기다리는 PR이 없습니다.");
   reviewed.forEach(p => { p.created = p.threads[0] && p.threads[0].replyAt; });
   fill("rev", reviewed, { tone: ["var(--reply)", "var(--reply-soft)"], pill: "확인 필요",
          ageFmt: d => d < 1 ? "오늘 답글" : Math.round(d) + "일 전 답글" },
@@ -832,13 +852,15 @@
 
   const tiles = [
     { label: "리뷰 대기", n: mine.length, unit: "건",
-      note: stale ? stale + "건이 3일 이상 대기" : "모두 오늘 올린 PR",
+      note: stale ? stale + "건이 3일 이상 대기" : "3일 넘게 묵은 건 없음",
       tone: stale ? "var(--wait)" : "var(--muted)" },
     { label: "응답 필요", n: needReply.length, unit: "건",
-      note: needReply.length ? "코멘트에 답변 대기 중" : "밀린 답변 없음",
+      note: needReply.length
+        ? [...new Set(needReply.map(actionReason))].join(" · ")
+        : "내 차례인 건 없음",
       tone: needReply.length ? "var(--reply)" : "var(--ready)" },
-    { label: "머지 대기", n: readyToMerge.length, unit: "건",
-      note: readyToMerge.length ? "승인 완료, 머지만 남음" : "승인 대기 중인 건만 남음",
+    { label: "머지 가능", n: readyToMerge.length, unit: "건",
+      note: readyToMerge.length ? "승인 완료, 머지만 남음" : "머지 대기 중인 건 없음",
       tone: readyToMerge.length ? "var(--ready)" : "var(--muted)" },
     { label: "내 리뷰 답글", n: reviewed.length, unit: "건",
       note: reviewed.length ? "리뷰이 반론에 확인 필요" : "미확인 답글 없음",

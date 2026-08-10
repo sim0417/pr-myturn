@@ -20,6 +20,7 @@ query($q:String!){
   search(query:$q, type:ISSUE, first:50){
     nodes{ ... on PullRequest {
       number title url createdAt isDraft mergeable
+      reviewDecision mergeStateStatus
       repository{ nameWithOwner owner{login} }
       reviews(last:20){ nodes{ author{login} state submittedAt } }
       reviewThreads(last:20){ nodes{
@@ -52,6 +53,10 @@ PARSED=$(printf '%s' "$RAW" | jq --arg me "$ME" --arg bots "$BOTS" \
         repo: $pr.repository.nameWithOwner,
         num: $pr.number, title: $pr.title, url: $pr.url,
         created: $pr.createdAt, mergeable: $pr.mergeable,
+        # 승인 개수를 세는 것보다 GitHub 의 판정이 정확하다. 브랜치 보호 규칙의
+        # 필요 승인 수까지 반영해 APPROVED / CHANGES_REQUESTED / REVIEW_REQUIRED 로 준다.
+        reviewDecision: $pr.reviewDecision,
+        mergeState: $pr.mergeStateStatus,
         approvals: $approvals, changesRequested: $changes,
         unresolvedThreads: $threads,
         pendingReply: (
@@ -72,23 +77,40 @@ if [ "${1:-}" = "--json" ]; then printf '%s\n' "$PARSED"; exit 0; fi
 
 printf '%s' "$PARSED" | jq -r '
   def line: "  \(.repo)#\(.num)  \(.title)\n    \(.url)";
-  ( [ .[] | select((.approvals|length)==0) ] ) as $waiting
-  | ( [ .[] | select(.pendingReply != null or (.unresolvedThreads|length)>0) ] ) as $reply
-  | ( [ .[] | select((.approvals|length)>0) ] ) as $merge
-  | "[1] 리뷰 대기 (승인 0건) — \($waiting|length)건",
-    ( if ($waiting|length)==0 then "  없음" else ($waiting[] | line) end ),
+
+  # 한 PR 은 한 구획에만 들어간다. 승인을 받았어도 답할 것이 남았으면 그게 먼저다.
+  def needsAction:
+    .reviewDecision == "CHANGES_REQUESTED"
+    or .pendingReply != null
+    or (.unresolvedThreads | length) > 0
+    or (.reviewDecision == "APPROVED" and (.mergeState == "DIRTY" or .mergeState == "BEHIND"));
+  def reason:
+    if .reviewDecision == "CHANGES_REQUESTED" then "변경 요청"
+    elif .mergeState == "DIRTY" then "충돌 해결"
+    elif .mergeState == "BEHIND" then "브랜치 업데이트"
+    elif .pendingReply != null then "답변 필요"
+    else "미해결 스레드" end;
+
+  ( [ .[] | select(needsAction) ] ) as $action
+  | ( [ .[] | select((needsAction | not) and .reviewDecision == "APPROVED") ] ) as $merge
+  | ( [ .[] | select((needsAction | not) and .reviewDecision != "APPROVED") ] ) as $waiting
+  | "[1] 리뷰 대기 — \($waiting|length)건",
+    ( if ($waiting|length)==0 then "  없음"
+      else ($waiting[] | line, "    └ \(.reviewDecision // "리뷰어 없음")")
+      end ),
     "",
-    "[2] 응답 필요 — \($reply|length)건",
-    ( if ($reply|length)==0 then "  없음"
-      else ($reply[]
+    "[2] 응답 필요 — \($action|length)건",
+    ( if ($action|length)==0 then "  없음"
+      else ($action[]
         | line,
+          "    └ [\(reason)]",
           ( if .pendingReply != null
             then "    └ \(.pendingReply.by) (\(.pendingReply.at)): \(.pendingReply.snippet)"
             else empty end ),
           ( .unresolvedThreads[] | "    └ [\(.path)] \(.lastBy): \(.snippet)" ))
       end ),
     "",
-    "[3] 머지 대기 (승인 완료) — \($merge|length)건",
+    "[3] 머지 가능 — \($merge|length)건",
     ( if ($merge|length)==0 then "  없음"
-      else ($merge[] | line, "    └ 승인: \(.approvals|join(", "))  / mergeable: \(.mergeable)")
+      else ($merge[] | line, "    └ 승인: \(.approvals|join(", "))  / \(.mergeState)")
       end )'

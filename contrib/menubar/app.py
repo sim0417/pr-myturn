@@ -82,19 +82,42 @@ class Dashboard(rumps.App):
 
     # 분류 --------------------------------------------------------------
 
+    # 대시보드와 같은 규칙을 쓴다. 한 PR 은 한 구획에만 들어가고, 승인을 받았어도
+    # 답할 것이 남았으면 그게 먼저다. 판정은 GitHub 의 reviewDecision 을 따른다.
+    @staticmethod
+    def needs_action(p):
+        return bool(
+            p.get("reviewDecision") == "CHANGES_REQUESTED"
+            or p.get("pendingReply")
+            or p.get("unresolvedThreads")
+            or (p.get("reviewDecision") == "APPROVED"
+                and p.get("mergeState") in ("DIRTY", "BEHIND")))
+
+    @staticmethod
+    def action_reason(p):
+        if p.get("reviewDecision") == "CHANGES_REQUESTED":
+            return "변경 요청"
+        if p.get("mergeState") == "DIRTY":
+            return "충돌 해결"
+        if p.get("mergeState") == "BEHIND":
+            return "브랜치 업데이트"
+        if p.get("pendingReply"):
+            return "답변 필요"
+        return "미해결 스레드"
+
     @property
     def need_reply(self):
-        return [p for p in self.prs if p.get("pendingReply") or p.get("unresolvedThreads")]
+        return [p for p in self.prs if self.needs_action(p)]
 
     @property
     def ready_to_merge(self):
-        return [p for p in self.prs if p.get("approvals")]
+        return [p for p in self.prs
+                if not self.needs_action(p) and p.get("reviewDecision") == "APPROVED"]
 
     @property
     def waiting(self):
         return [p for p in self.prs
-                if not p.get("approvals") and not p.get("pendingReply")
-                and not p.get("unresolvedThreads")]
+                if not self.needs_action(p) and p.get("reviewDecision") != "APPROVED"]
 
     # 표시 --------------------------------------------------------------
 
@@ -112,7 +135,7 @@ class Dashboard(rumps.App):
         if self.error:
             items.append(rumps.MenuItem(f"수집 실패 — {self.error}"))
         else:
-            items += self.section("답변 필요", self.need_reply)
+            items += self.section("내 차례", self.need_reply, self.action_reason)
             items += self.section("머지 가능", self.ready_to_merge)
             items += self.section("리뷰 대기", self.waiting)
             if not self.prs:
@@ -126,7 +149,7 @@ class Dashboard(rumps.App):
             items.append(rumps.MenuItem(f"마지막 갱신 {stamp}"))
         self.menu = items
 
-    def section(self, label, prs):
+    def section(self, label, prs, reason=None):
         """구획 제목과 그 아래 PR 항목들. 항목을 누르면 그 PR 을 연다."""
         if not prs:
             return []
@@ -135,7 +158,8 @@ class Dashboard(rumps.App):
             title = p["title"]
             if len(title) > 52:
                 title = title[:51] + "…"
-            item = rumps.MenuItem(f"    {p['repo'].split('/')[-1]}#{p['num']}  {title}",
+            tag = f"[{reason(p)}] " if reason else ""
+            item = rumps.MenuItem(f"    {p['repo'].split('/')[-1]}#{p['num']}  {tag}{title}",
                                   callback=self.open_pr)
             item.pr_url = p["url"]
             out.append(item)

@@ -555,7 +555,7 @@
     <div class="sec-head" id="h-wait">
       <h2>내 PR — 리뷰 대기</h2>
       <span class="count" id="c-wait"></span>
-      <span class="desc">승인 0건. 대기 일수 순</span>
+      <span class="desc">아직 승인 전. 상대 차례</span>
     </div>
     <div class="rows" id="wait"></div>
   </section>
@@ -564,16 +564,16 @@
     <div class="sec-head">
       <h2>내 PR — 응답 필요</h2>
       <span class="count" id="c-reply"></span>
-      <span class="desc">상대 코멘트에 내 답이 없는 건</span>
+      <span class="desc">변경 요청·미해결 스레드·미답변. 내 차례</span>
     </div>
     <div class="rows" id="reply"></div>
   </section>
 
   <section>
     <div class="sec-head" id="h-ready">
-      <h2>내 PR — 머지 대기</h2>
+      <h2>내 PR — 머지 가능</h2>
       <span class="count" id="c-ready"></span>
-      <span class="desc">승인받고 아직 머지하지 않은 건</span>
+      <span class="desc">승인 완료, 막힌 것 없음</span>
     </div>
     <div class="rows" id="ready"></div>
   </section>
@@ -609,7 +609,7 @@
 <script>
   /* 빌드 시 pr-dashboard.sh 가 실제 데이터를 주입한다. */
   const DATA = {
-  "generatedAt": "2026-08-07T06:24:29Z",
+  "generatedAt": "2026-08-10T05:03:27Z",
   "closedAgeSec": 420,
   "mine": [
     {
@@ -617,8 +617,10 @@
       "num": 412,
       "title": "Feat: 검색 결과 무한 스크롤 도입",
       "url": "https://github.com/acme/acme-web/pull/412",
-      "created": "2026-08-01T20:48:29Z",
+      "created": "2026-08-04T19:27:27Z",
       "mergeable": "MERGEABLE",
+      "reviewDecision": "REVIEW_REQUIRED",
+      "mergeState": "BLOCKED",
       "approvals": [],
       "changesRequested": [],
       "unresolvedThreads": [],
@@ -629,8 +631,10 @@
       "num": 418,
       "title": "Refactor: 결제 폼 상태를 리듀서로 정리",
       "url": "https://github.com/acme/acme-web/pull/418",
-      "created": "2026-08-04T04:00:29Z",
+      "created": "2026-08-07T02:39:27Z",
       "mergeable": "MERGEABLE",
+      "reviewDecision": "REVIEW_REQUIRED",
+      "mergeState": "BLOCKED",
       "approvals": [],
       "changesRequested": [],
       "unresolvedThreads": [],
@@ -641,8 +645,10 @@
       "num": 77,
       "title": "Feat: Toast 컴포넌트 variant 추가",
       "url": "https://github.com/acme/design-system/pull/77",
-      "created": "2026-08-06T16:00:29Z",
+      "created": "2026-08-09T14:39:27Z",
       "mergeable": "MERGEABLE",
+      "reviewDecision": "REVIEW_REQUIRED",
+      "mergeState": "BLOCKED",
       "approvals": [],
       "changesRequested": [],
       "unresolvedThreads": [],
@@ -653,24 +659,48 @@
       "num": 405,
       "title": "Fix: 장바구니 수량 변경 시 합계가 갱신되지 않던 문제",
       "url": "https://github.com/acme/acme-web/pull/405",
-      "created": "2026-08-01T01:36:29Z",
+      "created": "2026-08-04T00:15:27Z",
       "mergeable": "MERGEABLE",
-      "approvals": [],
+      "reviewDecision": "APPROVED",
+      "mergeState": "CLEAN",
+      "approvals": [
+        "monalisa"
+      ],
       "changesRequested": [],
       "unresolvedThreads": [],
       "pendingReply": {
         "by": "monalisa",
-        "at": "2026-08-06T11:12:29Z",
+        "at": "2026-08-09T09:51:27Z",
         "snippet": "이거 배포 순서가 API 쪽 변경보다 먼저여야 하나요? 릴리스 노트에 적어둘게요."
       }
+    },
+    {
+      "repo": "acme/api-gateway",
+      "num": 149,
+      "title": "Refactor: 재시도 정책을 미들웨어로 분리",
+      "url": "https://github.com/acme/api-gateway/pull/149",
+      "created": "2026-08-06T02:39:27Z",
+      "mergeable": "MERGEABLE",
+      "reviewDecision": "CHANGES_REQUESTED",
+      "mergeState": "BLOCKED",
+      "approvals": [
+        "monalisa"
+      ],
+      "changesRequested": [
+        "hubot"
+      ],
+      "unresolvedThreads": [],
+      "pendingReply": null
     },
     {
       "repo": "acme/acme-web",
       "num": 421,
       "title": "Chore: 사용하지 않는 아이콘 에셋 정리",
       "url": "https://github.com/acme/acme-web/pull/421",
-      "created": "2026-08-06T01:36:29Z",
+      "created": "2026-08-09T00:15:27Z",
       "mergeable": "MERGEABLE",
+      "reviewDecision": "APPROVED",
+      "mergeState": "CLEAN",
       "approvals": [
         "monalisa"
       ],
@@ -683,8 +713,10 @@
       "num": 156,
       "title": "Feat: 요청 로깅에 트레이스 ID 전파",
       "url": "https://github.com/acme/api-gateway/pull/156",
-      "created": "2026-08-04T23:12:29Z",
+      "created": "2026-08-07T21:51:27Z",
       "mergeable": "MERGEABLE",
+      "reviewDecision": "APPROVED",
+      "mergeState": "CLEAN",
       "approvals": [
         "hubot",
         "monalisa"
@@ -701,14 +733,14 @@
       "title": "Perf: 커넥션 풀 크기를 환경별로 분리",
       "url": "https://github.com/acme/api-gateway/pull/151",
       "author": "hubot",
-      "updated": "2026-08-06T23:12:29Z",
+      "updated": "2026-08-09T21:51:27Z",
       "threads": [
         {
           "path": "src/pool/config.ts",
           "resolved": false,
           "myPoint": "기본값을 8로 두면 스테이징에서 커넥션이 남지 않을 것 같은데, 근거가 있을까요?",
           "replyBy": "hubot",
-          "replyAt": "2026-08-06T23:12:29Z",
+          "replyAt": "2026-08-09T21:51:27Z",
           "reply": "부하 테스트에서 6까지 쓰는 걸 확인해서 여유를 둔 값입니다. 스테이징은 4로 낮추겠습니다.",
           "link": "https://github.com/acme/api-gateway/pull/151#discussion_r1"
         }
@@ -720,14 +752,14 @@
       "title": "Fix: Select 키보드 탐색이 그룹 헤더에서 멈추던 문제",
       "url": "https://github.com/acme/design-system/pull/74",
       "author": "monalisa",
-      "updated": "2026-08-05T08:48:29Z",
+      "updated": "2026-08-08T07:27:27Z",
       "threads": [
         {
           "path": "src/Select/useKeyboard.ts",
           "resolved": false,
           "myPoint": "헤더를 건너뛰는 대신 aria-disabled 를 주는 편이 스크린리더에 낫지 않을까요?",
           "replyBy": "monalisa",
-          "replyAt": "2026-08-05T08:48:29Z",
+          "replyAt": "2026-08-08T07:27:27Z",
           "reply": "그렇게 하면 NVDA 에서 항목 수가 어긋나더라고요. 일단 건너뛰기로 두고 별도 이슈로 남기겠습니다.",
           "link": "https://github.com/acme/design-system/pull/74#discussion_r2"
         }
@@ -793,12 +825,30 @@
   const NAMES = CONFIG.names || {};
   const who = login => NAMES[login] || login;
 
-  const mine = DATA.mine.filter(p => p.approvals.length === 0
-    && !p.pendingReply && p.unresolvedThreads.length === 0);
+  // 한 PR 은 한 구획에만 들어간다. 승인을 하나 받았어도 답할 것이 남아 있으면
+  // 그게 먼저다. 승인 개수를 세는 대신 GitHub 의 reviewDecision 을 쓴다.
+  // 브랜치 보호의 필요 승인 수까지 반영된 판정이라 "승인 1/2" 도 정확히 걸러진다.
+  const needsAction = p =>
+    p.reviewDecision === "CHANGES_REQUESTED"
+    || !!p.pendingReply
+    || p.unresolvedThreads.length > 0
+    || (p.reviewDecision === "APPROVED"
+        && (p.mergeState === "DIRTY" || p.mergeState === "BEHIND"));
 
-  const needReply = DATA.mine.filter(p => p.pendingReply || p.unresolvedThreads.length > 0);
+  // 배지에 쓸 사유. 손이 많이 가는 것부터 본다.
+  const actionReason = p =>
+    p.reviewDecision === "CHANGES_REQUESTED" ? "변경 요청" :
+    p.mergeState === "DIRTY" ? "충돌 해결" :
+    p.mergeState === "BEHIND" ? "브랜치 업데이트" :
+    p.pendingReply ? "답변 필요" : "미해결 스레드";
 
-  const readyToMerge = DATA.mine.filter(p => p.approvals.length > 0);
+  const needReply = DATA.mine.filter(needsAction);
+
+  const readyToMerge = DATA.mine.filter(p =>
+    !needsAction(p) && p.reviewDecision === "APPROVED");
+
+  const mine = DATA.mine.filter(p =>
+    !needsAction(p) && p.reviewDecision !== "APPROVED");
 
   const reviewed = DATA.reviewedOpen.map(p => ({ ...p, author: who(p.author) }));
 
@@ -913,7 +963,9 @@
     meta.append(el("span", "repo", pr.repo), el("span", "num", "#" + pr.num));
     if (pr.author) meta.append(el("span", "author", "작성자 " + pr.author));
     if (opts.pill) {
-      const p = el("span", "pill", opts.pill);
+      // 구획마다 고정 문구를 쓰기도 하고, PR 별로 사유를 계산하기도 한다.
+      const p = el("span", "pill",
+        typeof opts.pill === "function" ? opts.pill(pr) : opts.pill);
       p.style.setProperty("--tone", tone);
       p.style.setProperty("--tone-soft", soft);
       meta.append(p);
@@ -974,10 +1026,10 @@
   }
 
   fill("wait", [...mine].sort(byAge), {}, "리뷰 대기 중인 PR이 없습니다.");
-  fill("reply", needReply, { tone: ["var(--reply)", "var(--reply-soft)"], pill: "답변 필요" },
-       "답변을 기다리는 코멘트가 없습니다.");
+  fill("reply", needReply, { tone: ["var(--reply)", "var(--reply-soft)"], pill: actionReason },
+       "내 차례인 PR이 없습니다.");
   fill("ready", readyToMerge, { tone: ["var(--ready)", "var(--ready-soft)"], pill: "머지 가능" },
-       "승인받고 남아 있는 PR이 없습니다.");
+       "머지를 기다리는 PR이 없습니다.");
   reviewed.forEach(p => { p.created = p.threads[0] && p.threads[0].replyAt; });
   fill("rev", reviewed, { tone: ["var(--reply)", "var(--reply-soft)"], pill: "확인 필요",
          ageFmt: d => d < 1 ? "오늘 답글" : Math.round(d) + "일 전 답글" },
@@ -1009,13 +1061,15 @@
 
   const tiles = [
     { label: "리뷰 대기", n: mine.length, unit: "건",
-      note: stale ? stale + "건이 3일 이상 대기" : "모두 오늘 올린 PR",
+      note: stale ? stale + "건이 3일 이상 대기" : "3일 넘게 묵은 건 없음",
       tone: stale ? "var(--wait)" : "var(--muted)" },
     { label: "응답 필요", n: needReply.length, unit: "건",
-      note: needReply.length ? "코멘트에 답변 대기 중" : "밀린 답변 없음",
+      note: needReply.length
+        ? [...new Set(needReply.map(actionReason))].join(" · ")
+        : "내 차례인 건 없음",
       tone: needReply.length ? "var(--reply)" : "var(--ready)" },
-    { label: "머지 대기", n: readyToMerge.length, unit: "건",
-      note: readyToMerge.length ? "승인 완료, 머지만 남음" : "승인 대기 중인 건만 남음",
+    { label: "머지 가능", n: readyToMerge.length, unit: "건",
+      note: readyToMerge.length ? "승인 완료, 머지만 남음" : "머지 대기 중인 건 없음",
       tone: readyToMerge.length ? "var(--ready)" : "var(--muted)" },
     { label: "내 리뷰 답글", n: reviewed.length, unit: "건",
       note: reviewed.length ? "리뷰이 반론에 확인 필요" : "미확인 답글 없음",

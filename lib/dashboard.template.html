@@ -616,30 +616,14 @@
   const NAMES = CONFIG.names || {};
   const who = login => NAMES[login] || login;
 
-  // 한 PR 은 한 구획에만 들어간다. 승인을 하나 받았어도 답할 것이 남아 있으면
-  // 그게 먼저다. 승인 개수를 세는 대신 GitHub 의 reviewDecision 을 쓴다.
-  // 브랜치 보호의 필요 승인 수까지 반영된 판정이라 "승인 1/2" 도 정확히 걸러진다.
-  const needsAction = p =>
-    p.reviewDecision === "CHANGES_REQUESTED"
-    || !!p.pendingReply
-    || p.unresolvedThreads.length > 0
-    || (p.reviewDecision === "APPROVED"
-        && (p.mergeState === "DIRTY" || p.mergeState === "BEHIND"));
+  // 분류는 pr-status.sh 가 이미 끝냈다. 여기서 다시 판정하지 않는다.
+  // 판정을 두 벌 두면 언젠가 어긋나고, 어긋난 쪽을 찾기가 어렵다.
+  const inBucket = b => DATA.mine.filter(p => p.bucket === b);
+  const actionReason = p => p.reason;
 
-  // 배지에 쓸 사유. 손이 많이 가는 것부터 본다.
-  const actionReason = p =>
-    p.reviewDecision === "CHANGES_REQUESTED" ? "변경 요청" :
-    p.mergeState === "DIRTY" ? "충돌 해결" :
-    p.mergeState === "BEHIND" ? "브랜치 업데이트" :
-    p.pendingReply ? "답변 필요" : "미해결 스레드";
-
-  const needReply = DATA.mine.filter(needsAction);
-
-  const readyToMerge = DATA.mine.filter(p =>
-    !needsAction(p) && p.reviewDecision === "APPROVED");
-
-  const mine = DATA.mine.filter(p =>
-    !needsAction(p) && p.reviewDecision !== "APPROVED");
+  const needReply = inBucket("action");
+  const readyToMerge = inBucket("merge");
+  const mine = inBucket("waiting");
 
   const reviewed = DATA.reviewedOpen.map(p => ({ ...p, author: who(p.author) }));
 

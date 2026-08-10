@@ -21,6 +21,13 @@ REPO = pathlib.Path(__file__).resolve().parents[2]
 STATUS = REPO / "bin" / "pr-status.sh"
 DASHBOARD = REPO / "bin" / "pr-dashboard.sh"
 
+# 수집할 때마다 여기에도 써 둔다. 에이전트는 GitHub 을 다시 부르지 않고 이 파일만
+# 읽으면 된다. 대시보드를 빌드할 때는 pr-dashboard.sh 가 리뷰 답글까지 채워 덮어쓴다.
+CACHE = pathlib.Path(
+    os.environ.get("PR_MYTURN_CACHE")
+    or pathlib.Path(os.environ.get("XDG_CACHE_HOME", pathlib.Path.home() / ".cache")) / "pr-myturn")
+STATUS_JSON = CACHE / "status.json"
+
 # GUI 로 띄우면 로그인 셸의 PATH 를 물려받지 못해 gh 나 jq 를 찾지 못한다.
 # /usr/sbin 도 넣는다. lsof 같은 도구가 거기 있고, 빠지면 하위 스크립트가
 # 조용히 다른 길로 새기 때문이다.
@@ -71,6 +78,7 @@ class Dashboard(rumps.App):
                 text=True, timeout=60, check=True).stdout
             self.prs = json.loads(out)
             self.error = None
+            self.write_status()
         except subprocess.CalledProcessError as e:
             self.error = (e.stderr or "").strip().splitlines()[-1:] or ["수집 실패"]
             self.error = self.error[0][:80]
@@ -82,44 +90,55 @@ class Dashboard(rumps.App):
         self.fetched_at = time.localtime()
         self.render()
 
+    def write_status(self):
+        """에이전트가 읽는 파일. 5분마다 최신으로 유지된다.
+
+        리뷰 답글(reviewedOpen)은 수집이 무거워 여기서는 채우지 않는다.
+        대시보드를 열면 pr-dashboard.sh 가 그것까지 채워 덮어쓴다.
+        """
+        payload = {
+            "generatedAt": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
+            "counts": {
+                "action": len(self.need_reply),
+                "merge": len(self.ready_to_merge),
+                "waiting": len(self.waiting),
+                "reviewReplies": None,
+            },
+            "mine": self.prs,
+            "reviewedOpen": None,
+        }
+        try:
+            CACHE.mkdir(parents=True, exist_ok=True)
+            CACHE.chmod(0o700)
+            tmp = STATUS_JSON.with_suffix(".json.tmp")
+            tmp.write_text(json.dumps(payload, ensure_ascii=False, indent=2))
+            tmp.chmod(0o600)
+            tmp.replace(STATUS_JSON)
+        except OSError:
+            pass          # 배지를 띄우는 일이 더 중요하다. 여기서 앱을 멈추지 않는다
+
     # 분류 --------------------------------------------------------------
 
-    # 대시보드와 같은 규칙을 쓴다. 한 PR 은 한 구획에만 들어가고, 승인을 받았어도
-    # 답할 것이 남았으면 그게 먼저다. 판정은 GitHub 의 reviewDecision 을 따른다.
-    @staticmethod
-    def needs_action(p):
-        return bool(
-            p.get("reviewDecision") == "CHANGES_REQUESTED"
-            or p.get("pendingReply")
-            or p.get("unresolvedThreads")
-            or (p.get("reviewDecision") == "APPROVED"
-                and p.get("mergeState") in ("DIRTY", "BEHIND")))
+    # 분류는 pr-status.sh 가 이미 끝냈다. 여기서 다시 판정하지 않는다.
+    # 판정을 두 벌 두면 언젠가 어긋나고, 어긋난 쪽을 찾기가 어렵다.
+    def in_bucket(self, name):
+        return [p for p in self.prs if p.get("bucket") == name]
 
     @staticmethod
     def action_reason(p):
-        if p.get("reviewDecision") == "CHANGES_REQUESTED":
-            return "변경 요청"
-        if p.get("mergeState") == "DIRTY":
-            return "충돌 해결"
-        if p.get("mergeState") == "BEHIND":
-            return "브랜치 업데이트"
-        if p.get("pendingReply"):
-            return "답변 필요"
-        return "미해결 스레드"
+        return p.get("reason") or ""
 
     @property
     def need_reply(self):
-        return [p for p in self.prs if self.needs_action(p)]
+        return self.in_bucket("action")
 
     @property
     def ready_to_merge(self):
-        return [p for p in self.prs
-                if not self.needs_action(p) and p.get("reviewDecision") == "APPROVED"]
+        return self.in_bucket("merge")
 
     @property
     def waiting(self):
-        return [p for p in self.prs
-                if not self.needs_action(p) and p.get("reviewDecision") != "APPROVED"]
+        return self.in_bucket("waiting")
 
     # 표시 --------------------------------------------------------------
 

@@ -3,8 +3,8 @@
 내가 올린 PR과 내가 리뷰한 PR 중 **지금 내 차례인 것**만 골라 보여주는 로컬 대시보드입니다.
 GitHub 알림함은 읽은 것과 안 읽은 것으로만 나뉘지만, 실제로 알고 싶은 건 "누가 나를 기다리고 있나"입니다.
 
-`gh` CLI 위에서 도는 셸 스크립트 세 개와 정적 HTML 하나가 전부입니다. 서버에 데이터를 보내지 않고,
-토큰을 따로 저장하지도 않습니다.
+`gh` CLI 위에서 도는 셸 스크립트 세 개와 정적 HTML 하나가 전부입니다. 서버를 띄우지 않고,
+데이터를 밖으로 보내지 않고, 토큰을 따로 저장하지도 않습니다.
 
 <picture>
   <source media="(prefers-color-scheme: dark)" srcset="docs/pr-dashboard-dark.png">
@@ -50,21 +50,35 @@ cd pr-myturn
 ./bin/pr-dashboard.sh
 ```
 
-브라우저가 열립니다. 새로고침할 때마다 다시 수집합니다.
+수집한 뒤 브라우저가 열립니다. 서버는 없습니다 — 정적 파일 하나입니다.
 
 ```
-pr-dashboard.sh            서버를 띄우고 브라우저로 열기
+pr-dashboard.sh            수집해서 브라우저로 열기
 pr-dashboard.sh --full     머지된 PR 답글까지 강제 재수집
-pr-dashboard.sh --file     서버 없이 정적 파일로 열기
-pr-dashboard.sh --stop     백그라운드 서버 종료
+pr-dashboard.sh --no-open  파일만 갱신
 ```
 
-스크립트는 개별로도 씁니다. `--json` 을 붙이면 가공용 JSON이 나옵니다.
+스크립트는 개별로도 씁니다.
 
 ```sh
-./bin/pr-status.sh                  # 내 PR 3분류
+./bin/pr-status.sh                  # 사람이 읽는 3분류
+./bin/pr-status.sh --md             # 마크다운 (에이전트·슬랙용)
+./bin/pr-status.sh --json           # 구조화된 데이터
 ./bin/pr-review-replies.sh --json   # 내 리뷰에 달린 미확인 답글
 ```
+
+### 산출물
+
+전부 `~/.cache/pr-myturn/` 아래, 소유자만 읽을 수 있는 권한(`700`/`600`)으로 떨어집니다.
+
+| 파일 | 쓰는 쪽 | 읽는 쪽 |
+|---|---|---|
+| `dashboard.html` | `pr-dashboard.sh` | 사람 (브라우저) |
+| `status.json` | 메뉴바 앱(5분마다) · `pr-dashboard.sh` | 에이전트 |
+| `replies-closed.json` | `pr-dashboard.sh` | 내부 캐시 |
+
+`status.json` 의 `reviewedOpen` 은 대시보드를 빌드할 때만 채워집니다(수집이 무겁습니다).
+메뉴바 앱이 쓴 것에는 `null` 입니다.
 
 ## 설정
 
@@ -127,16 +141,49 @@ PR 6          ← 응답 필요 + 머지 가능 건수
 macOS 는 GUI 세션에 속한 프로세스만 상태 아이템을 그리기 때문이며, `install.sh` 가 launchd 에
 등록하는 이유입니다. 첫 알림에서 macOS 가 권한을 물을 수 있습니다.
 
+## 에이전트에게 물어보기
+
+"내 PR 어때?" 를 코딩 에이전트에게 물을 수 있습니다. 세 갈래가 있고, 아래로 갈수록 매끄럽습니다.
+
+**1. 파일 하나 읽히기.** 준비할 게 없습니다.
+
+```
+~/.cache/pr-myturn/status.json 읽고 내 차례인 거 알려줘
+```
+
+**2. 스킬.** `/pr-myturn` 으로 부르거나, "PR 현황" 같은 말에 알아서 걸립니다.
+
+```sh
+mkdir -p ~/.claude/skills/pr-myturn
+cp contrib/claude-skill/SKILL.md ~/.claude/skills/pr-myturn/
+```
+
+**3. MCP 서버.** 에이전트가 도구로 직접 호출합니다. 경로를 알려줄 필요도 없습니다.
+
+```sh
+claude mcp add --scope user pr-myturn -- python3 "$PWD/contrib/mcp/server.py"
+```
+
+`pr_status`(bucket 으로 거를 수 있음)와 `pr_review_replies` 두 도구가 붙습니다. 의존성은 없습니다 —
+MCP 는 stdio 위의 JSON-RPC 라 표준 라이브러리로 충분하고, 상시 도는 코드에 패키지를 더하지
+않으려고 그렇게 했습니다.
+
+세 갈래 모두 **`bucket` 과 `reason` 을 그대로 씁니다.** 에이전트가 승인 개수를 세거나 코멘트를
+해석해 재분류하면 도구의 판정과 어긋나므로, 스킬과 도구 설명 양쪽에 "다시 판정하지 마라" 를
+적어두었습니다.
+
+`pr_status` 는 `status.json` 이 10분 이내면 그것으로 답하고, 오래됐거나 `refresh: true` 면
+GitHub 에서 새로 받습니다. 응답의 `meta.source` 로 어느 쪽인지 알 수 있습니다.
+
 ## 데이터와 보안
 
-- 수집한 데이터는 `~/.cache/pr-dashboard/` 아래에만 남습니다. 외부로 나가지 않습니다.
+- 수집한 데이터는 `~/.cache/pr-myturn/` 아래에만 남습니다. 외부로 나가지 않습니다.
   캐시 디렉터리는 `700`, 그 안의 파일은 `600` 으로 만듭니다. PR 제목과 코멘트 원문이
   담기는 곳이라 같은 머신의 다른 계정에게도 보이지 않아야 합니다.
 - 메뉴바 앱의 의존성은 `contrib/menubar/requirements.txt` 에 버전을 고정했습니다.
   launchd 로 상시 실행되는 코드라 매번 최신을 받아오지 않습니다.
 - 인증은 전적으로 `gh` CLI에 맡깁니다. 이 저장소의 코드는 토큰을 읽거나 저장하지 않습니다.
-- 로컬 서버는 `127.0.0.1` 에만 바인딩하고 `Host` 헤더를 검사합니다. 악성 페이지가 DNS
-  rebinding으로 대시보드 내용을 읽어가는 경로를 막기 위한 것입니다.
+- 로컬 HTTP 서버를 띄우지 않습니다. 열어둔 포트가 없으니 거기서 오는 위험도 없습니다.
 - PR 제목과 코멘트는 GitHub에서 온 신뢰할 수 없는 입력으로 다룹니다. DOM은 전부
   `textContent` 로 만들고, 데이터를 `<script>` 안에 넣을 때 `<` 를 `<` 로 이스케이프해
   스크립트 블록 탈출을 막습니다.

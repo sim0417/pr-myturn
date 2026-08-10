@@ -71,29 +71,67 @@ PARSED=$(printf '%s' "$RAW" | jq --arg me "$ME" --arg bots "$BOTS" \
                  snippet: ($lastHuman.body | gsub("\\s+";" ") | .[0:140]) }
           end)
       } ]
-  | sort_by(.created)')
+  | sort_by(.created)
 
-if [ "${1:-}" = "--json" ]; then printf '%s\n' "$PARSED"; exit 0; fi
+  # 분류는 여기서 한 번만 한다. 대시보드·메뉴바·MCP 가 이 bucket 을 그대로 쓰므로
+  # 판정이 여러 벌로 갈라지지 않는다. 한 PR 은 한 bucket 에만 속한다.
+  #   action  = 내 차례. 답하거나 고쳐야 한다
+  #   merge   = 승인 완료이고 막힌 것이 없다
+  #   waiting = 아직 승인 전. 상대 차례
+  | map(. + (
+      (.reviewDecision == "CHANGES_REQUESTED"
+       or .pendingReply != null
+       or (.unresolvedThreads | length) > 0
+       or (.reviewDecision == "APPROVED"
+           and (.mergeState == "DIRTY" or .mergeState == "BEHIND"))) as $action
+      | { bucket: (if $action then "action"
+                   elif .reviewDecision == "APPROVED" then "merge"
+                   else "waiting" end),
+          reason: (if ($action | not) then null
+                   elif .reviewDecision == "CHANGES_REQUESTED" then "변경 요청"
+                   elif .mergeState == "DIRTY" then "충돌 해결"
+                   elif .mergeState == "BEHIND" then "브랜치 업데이트"
+                   elif .pendingReply != null then "답변 필요"
+                   else "미해결 스레드" end) }))')
+
+case "${1:-}" in
+  --json) printf '%s\n' "$PARSED"; exit 0 ;;
+esac
+
+# 마크다운은 에이전트에게 그대로 넘기거나 슬랙에 붙여넣기 위한 것이다.
+# 링크와 사유만 남기고 사람이 읽는 군더더기는 뺀다.
+if [ "${1:-}" = "--md" ]; then
+  printf '%s' "$PARSED" | jq -r '
+    def rows(b): [ .[] | select(.bucket == b) ];
+    def item: "- [\(.repo)#\(.num)](\(.url)) \(.title)"
+              + (if .reason then "  — **\(.reason)**" else "" end);
+    rows("action") as $a | rows("merge") as $m | rows("waiting") as $w
+    | "# 내 PR 현황",
+      "",
+      "내 차례 \($a|length)건 · 머지 가능 \($m|length)건 · 리뷰 대기 \($w|length)건",
+      "",
+      "## 내 차례 (\($a|length))",
+      ( if ($a|length)==0 then "없음"
+        else ($a[] | item,
+              ( if .pendingReply then "  - \(.pendingReply.by): \(.pendingReply.snippet)" else empty end),
+              ( .unresolvedThreads[] | "  - `\(.path)` \(.lastBy): \(.snippet)" ))
+        end ),
+      "",
+      "## 머지 가능 (\($m|length))",
+      ( if ($m|length)==0 then "없음" else ($m[] | item) end ),
+      "",
+      "## 리뷰 대기 (\($w|length))",
+      ( if ($w|length)==0 then "없음"
+        else ($w[] | item + "  — 승인 \(.approvals|length)건")
+        end )'
+  exit 0
+fi
 
 printf '%s' "$PARSED" | jq -r '
   def line: "  \(.repo)#\(.num)  \(.title)\n    \(.url)";
+  def rows(b): [ .[] | select(.bucket == b) ];
 
-  # 한 PR 은 한 구획에만 들어간다. 승인을 받았어도 답할 것이 남았으면 그게 먼저다.
-  def needsAction:
-    .reviewDecision == "CHANGES_REQUESTED"
-    or .pendingReply != null
-    or (.unresolvedThreads | length) > 0
-    or (.reviewDecision == "APPROVED" and (.mergeState == "DIRTY" or .mergeState == "BEHIND"));
-  def reason:
-    if .reviewDecision == "CHANGES_REQUESTED" then "변경 요청"
-    elif .mergeState == "DIRTY" then "충돌 해결"
-    elif .mergeState == "BEHIND" then "브랜치 업데이트"
-    elif .pendingReply != null then "답변 필요"
-    else "미해결 스레드" end;
-
-  ( [ .[] | select(needsAction) ] ) as $action
-  | ( [ .[] | select((needsAction | not) and .reviewDecision == "APPROVED") ] ) as $merge
-  | ( [ .[] | select((needsAction | not) and .reviewDecision != "APPROVED") ] ) as $waiting
+  rows("waiting") as $waiting | rows("action") as $action | rows("merge") as $merge
   | "[1] 리뷰 대기 — \($waiting|length)건",
     ( if ($waiting|length)==0 then "  없음"
       else ($waiting[] | line, "    └ \(.reviewDecision // "리뷰어 없음")")
@@ -103,7 +141,7 @@ printf '%s' "$PARSED" | jq -r '
     ( if ($action|length)==0 then "  없음"
       else ($action[]
         | line,
-          "    └ [\(reason)]",
+          "    └ [\(.reason)]",
           ( if .pendingReply != null
             then "    └ \(.pendingReply.by) (\(.pendingReply.at)): \(.pendingReply.snippet)"
             else empty end ),

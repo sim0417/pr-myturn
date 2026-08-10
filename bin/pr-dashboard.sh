@@ -1,15 +1,14 @@
 #!/usr/bin/env bash
-# 내 PR 현황 대시보드를 최신 데이터로 만들어 브라우저에 띄운다.
+# 내 PR 현황을 수집해 대시보드 HTML 과 status.json 을 만들고 브라우저로 연다.
 #
-#   pr-dashboard.sh            # 서버를 띄우고 브라우저로 열기 (새로고침 = 재수집)
-#   pr-dashboard.sh --stop     # 백그라운드 서버 종료
-#   pr-dashboard.sh --file     # 서버 없이 정적 파일로만 열기
-#   pr-dashboard.sh --no-open  # 파일만 갱신
+#   pr-dashboard.sh            # 수집해서 브라우저로 열기
+#   pr-dashboard.sh --no-open  # 파일만 갱신 (메뉴바 앱·에이전트용)
 #   pr-dashboard.sh --full     # 머지된 PR 답글까지 강제 재수집 (약 20초)
-#   pr-dashboard.sh --serve    # 서버를 포그라운드로 실행 (Ctrl+C 종료)
 #
-# 기본이 서버인 이유: file:// 로 열면 클립보드 복사가 브라우저에 막힐 수 있고,
-# 새로고침만으로 최신 데이터를 받을 수 없다.
+# 예전에는 로컬 HTTP 서버를 띄우고 브라우저가 거기에 붙었다. 새로고침만으로
+# 재수집이 된다는 이점이 있었지만, 포트 충돌·좀비 프로세스·PATH 의존·DNS
+# rebinding 방어 같은 비용을 계속 물었다. 메뉴바 앱이 주기적으로 갱신하게
+# 되면서 그 이점이 사라져 서버를 걷어냈다. 지금은 정적 파일 하나가 전부다.
 #
 # 열린 PR 데이터는 매번 새로 받고, 머지된 PR 의 답글은 느리게 변하므로
 # CLOSED_TTL 초 동안 캐시를 재사용한다.
@@ -31,52 +30,24 @@ LIB="$(cd -P "$BIN/../lib" && pwd)"
 source "$LIB/common.sh"
 
 TEMPLATE="$LIB/dashboard.template.html"
-CACHE="${XDG_CACHE_HOME:-$HOME/.cache}/pr-dashboard"
 OUT="${PR_DASHBOARD_OUT:-$CACHE/dashboard.html}"
 CLOSED_CACHE="$CACHE/replies-closed.json"
 CLOSED_TTL="${PR_DASHBOARD_CLOSED_TTL:-3600}"
-OPEN_TTL="${PR_DASHBOARD_OPEN_TTL:-60}"   # 새로고침 연타로 GitHub 쿼터를 태우지 않도록
-PORT="${PR_DASHBOARD_PORT:-8787}"
+OPEN_TTL="${PR_DASHBOARD_OPEN_TTL:-60}"   # 연타로 GitHub 쿼터를 태우지 않도록
 
 DO_OPEN=true
-DO_SERVE=false
 FORCE_FULL=false
-FILE_MODE=false
-DO_STOP=false
 for a in "$@"; do
   case "$a" in
-    --no-open) DO_OPEN=false; FILE_MODE=true ;;
+    --no-open) DO_OPEN=false ;;
     --full)    FORCE_FULL=true ;;
-    --serve)   DO_SERVE=true; DO_OPEN=false ;;
-    --file)    FILE_MODE=true ;;
-    --stop)    DO_STOP=true ;;
+    --file)    ;;   # 서버가 없어진 뒤로는 이것이 기본이다. 옛 호출을 깨지 않으려 받아만 둔다
   esac
 done
 
-PIDFILE="$CACHE/server.pid"
-
-# bash 내장 /dev/tcp 로 연결만 시도한다. 외부 명령에 기대지 않는 이유가 있다.
-# lsof 를 쓰던 때, GUI 에서 띄운 메뉴바 앱이 넘겨준 PATH 에는 /usr/sbin 이 없어서
-# lsof 를 찾지 못했다. 그러면 이 함수가 늘 false 가 되고, 멀쩡히 떠 있는 서버를
-# 없다고 판단해 새로 띄우려다 포트 충돌로 exit 1 로 끝난다. 브라우저는 열리지 않는다.
-# curl 로 찔러보는 방식은 요청마다 재수집이 돌아 5초씩 걸리므로 쓰지 않는다.
-server_up() { (exec 3<>"/dev/tcp/127.0.0.1/$PORT") 2>/dev/null; }
-
 mkdir -p "$CACHE"
-# umask 는 앞으로 만들 것만 다스린다. 예전 버전이 644 로 남긴 것도 거둬들인다.
 chmod 700 "$CACHE" 2>/dev/null || true
 find "$CACHE" -maxdepth 1 -type f -exec chmod 600 {} + 2>/dev/null || true
-
-if [ "$DO_STOP" = true ]; then
-  if [ -f "$PIDFILE" ] && kill "$(cat "$PIDFILE")" 2>/dev/null; then
-    rm -f "$PIDFILE"
-    echo "대시보드 서버를 종료했습니다 (포트 $PORT)."
-  else
-    rm -f "$PIDFILE"
-    echo "실행 중인 대시보드 서버가 없습니다."
-  fi
-  exit 0
-fi
 
 # 파일이 생긴 지 몇 초 지났는지. 없으면 아주 큰 값.
 age_of() {
@@ -84,16 +55,10 @@ age_of() {
   echo $(( $(date +%s) - $(stat -f %m "$1" 2>/dev/null || stat -c %Y "$1") ))
 }
 
-build() {
-  local mine replies_open closed_age out_age
-
-  # 직전 빌드가 충분히 최신이면 GitHub 을 다시 부르지 않는다.
-  out_age=$(age_of "$OUT")
-  if [ "$FORCE_FULL" != true ] && [ "$out_age" -lt "$OPEN_TTL" ]; then
-    printf '최근 %s초 전 데이터를 재사용합니다 (OPEN_TTL=%s).\n' "$out_age" "$OPEN_TTL" >&2
-    return 0
-  fi
-
+out_age=$(age_of "$OUT")
+if [ "$FORCE_FULL" != true ] && [ "$out_age" -lt "$OPEN_TTL" ]; then
+  printf '최근 %s초 전 데이터를 재사용합니다 (OPEN_TTL=%s).\n' "$out_age" "$OPEN_TTL" >&2
+else
   mine=$("$BIN/pr-status.sh" --json)
   replies_open=$("$BIN/pr-review-replies.sh" --json)
 
@@ -120,6 +85,8 @@ build() {
                 reminderCc: ($config.reminderCc // ""),
                 excludeNote: ($config.excludeOwners // [] | join(", ")) }}')
 
+  write_status "$mine" "$replies_open"
+
   # __DATA__ 치환은 python 으로 한다. sed 는 개행·백슬래시에서 깨진다.
   DATA="$DATA" TEMPLATE="$TEMPLATE" OUT="$OUT" python3 - <<'PY'
 import os, pathlib
@@ -134,8 +101,8 @@ if "__DATA__" not in tpl:
 # 줄바꿈으로 취급되어 리터럴을 깨뜨리므로 같이 막는다.
 data = (os.environ["DATA"]
         .replace("<", "\\u003c")
-        .replace("\u2028", "\\u2028")
-        .replace("\u2029", "\\u2029"))
+        .replace(" ", "\\u2028")
+        .replace(" ", "\\u2029"))
 
 pathlib.Path(os.environ["OUT"]).write_text(tpl.replace("__DATA__", data, 1))
 PY
@@ -144,79 +111,8 @@ PY
     "$(printf '%s' "$mine" | jq 'length')" \
     "$(printf '%s' "$replies_open" | jq 'length')" \
     "$closed_age" >&2
-}
-
-if [ "$DO_SERVE" = true ]; then
-  export PR_DASHBOARD_OUT="$OUT"
-  echo "http://localhost:$PORT — 새로고침하면 다시 수집합니다. Ctrl+C 로 종료." >&2
-  BIN="$BIN" OUT="$OUT" PORT="$PORT" python3 - <<'PY'
-import http.server, os, pathlib, subprocess, socketserver
-
-OUT = pathlib.Path(os.environ["OUT"])
-PORT = int(os.environ["PORT"])
-BUILD = [str(pathlib.Path(os.environ["BIN"]) / "pr-dashboard.sh"), "--no-open"]
-
-# 루프백에만 바인딩해도 브라우저는 어떤 페이지에서든 이 주소로 요청을 보낼 수 있다.
-# 악성 사이트가 자기 도메인을 127.0.0.1 로 재바인딩하면(DNS rebinding) 동일 출처
-# 정책을 우회해 여기 응답을 읽어간다. Host 헤더를 제한해 그 경로를 막는다.
-ALLOWED_HOSTS = {f"localhost:{PORT}", f"127.0.0.1:{PORT}", f"[::1]:{PORT}"}
-
-class Handler(http.server.BaseHTTPRequestHandler):
-    def do_GET(self):
-        if self.headers.get("Host", "") not in ALLOWED_HOSTS:
-            self.send_error(403, "Host not allowed"); return
-        if self.path not in ("/", "/index.html"):
-            self.send_error(404); return
-        try:
-            subprocess.run(BUILD, check=True, stdout=subprocess.DEVNULL)
-        except subprocess.CalledProcessError as e:
-            # GitHub 쿼터 초과 등으로 수집이 실패해도, 직전 결과가 있으면 그것이라도 보여준다.
-            if not OUT.exists():
-                self.send_error(503, "수집 실패, 이전 결과도 없습니다"); return
-            print(f"수집 실패, 이전 결과를 내보냅니다: {e}", flush=True)
-        body = OUT.read_bytes()
-        self.send_response(200)
-        self.send_header("Content-Type", "text/html; charset=utf-8")
-        self.send_header("Content-Length", str(len(body)))
-        self.send_header("Cache-Control", "no-store")
-        self.send_header("X-Content-Type-Options", "nosniff")
-        self.end_headers()
-        self.wfile.write(body)
-
-    def log_message(self, fmt, *a):
-        pass
-
-class Server(socketserver.TCPServer):
-    allow_reuse_address = True
-
-with Server(("127.0.0.1", PORT), Handler) as httpd:
-    httpd.serve_forever()
-PY
-  exit 0
 fi
 
-if [ "$FILE_MODE" = true ]; then
-  build
-  [ "$DO_OPEN" = true ] && open "$OUT"
-  exit 0
+if [ "$DO_OPEN" = true ]; then
+  open "$OUT"
 fi
-
-# 기본 경로: 서버가 없으면 백그라운드로 띄우고 브라우저를 연다.
-if server_up; then
-  echo "이미 실행 중인 서버를 재사용합니다 — http://localhost:$PORT" >&2
-else
-  nohup "$BIN/pr-dashboard.sh" --serve >"$CACHE/server.log" 2>&1 &
-  echo $! > "$PIDFILE"
-  for _ in $(seq 1 40); do
-    server_up && break
-    sleep 0.25
-  done
-  if ! server_up; then
-    echo "서버를 띄우지 못했습니다. 로그: $CACHE/server.log" >&2
-    exit 1
-  fi
-  echo "서버 시작 — http://localhost:$PORT (종료: pr-dashboard.sh --stop)" >&2
-fi
-
-[ "$DO_OPEN" = true ] && open "http://localhost:$PORT/"
-exit 0

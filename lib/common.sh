@@ -25,6 +25,29 @@ cfg() { printf '%s' "$CONFIG" | jq -r --arg d "$2" ".$1 // \$d"; }
 
 ME=$(gh api user --jq '.login')
 
+# 산출물이 모이는 곳. 대시보드 HTML, status.json, 머지분 답글 캐시가 여기 있다.
+CACHE="${PR_MYTURN_CACHE:-${XDG_CACHE_HOME:-$HOME/.cache}/pr-myturn}"
+STATUS_JSON="$CACHE/status.json"
+
+# 에이전트가 읽는 파일. 사람이 보는 HTML 과 달리 마크업이 없어 그대로 넘길 수 있고,
+# 이미 수집해 둔 것을 읽으므로 GitHub 을 다시 부르지 않는다.
+# reviewedOpen 은 대시보드를 빌드할 때만 채워진다(수집이 무겁다). 없으면 null 이다.
+write_status() {
+  local mine="$1" reviewed="${2:-null}"
+  mkdir -p "$CACHE"
+  jq -n --argjson mine "$mine" --argjson reviewed "$reviewed" \
+     --arg now "$(date -u +%Y-%m-%dT%H:%M:%SZ)" '
+    { generatedAt: $now,
+      counts: { action:  ([ $mine[] | select(.bucket=="action")  ] | length),
+                merge:   ([ $mine[] | select(.bucket=="merge")   ] | length),
+                waiting: ([ $mine[] | select(.bucket=="waiting") ] | length),
+                reviewReplies: (if $reviewed == null then null else ($reviewed | length) end) },
+      mine: $mine,
+      reviewedOpen: $reviewed }' > "$STATUS_JSON.tmp" \
+    && mv "$STATUS_JSON.tmp" "$STATUS_JSON"
+  chmod 600 "$STATUS_JSON" 2>/dev/null || true
+}
+
 # 봇 로그인은 정규식으로 한 번에 거른다. 설정에 배열로 두고 여기서 조립한다.
 BOTS=$(printf '%s' "$CONFIG" | jq -r '
   (.bots // ["github-actions","dependabot","codecov","renovate"]) | join("|")')

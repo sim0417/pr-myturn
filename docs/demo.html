@@ -609,7 +609,7 @@
 <script>
   /* 빌드 시 pr-dashboard.sh 가 실제 데이터를 주입한다. */
   const DATA = {
-  "generatedAt": "2026-08-10T05:03:27Z",
+  "generatedAt": "2026-08-10T05:52:11Z",
   "closedAgeSec": 420,
   "mine": [
     {
@@ -617,49 +617,55 @@
       "num": 412,
       "title": "Feat: 검색 결과 무한 스크롤 도입",
       "url": "https://github.com/acme/acme-web/pull/412",
-      "created": "2026-08-04T19:27:27Z",
+      "created": "2026-08-04T20:16:11Z",
       "mergeable": "MERGEABLE",
       "reviewDecision": "REVIEW_REQUIRED",
       "mergeState": "BLOCKED",
       "approvals": [],
       "changesRequested": [],
       "unresolvedThreads": [],
-      "pendingReply": null
+      "pendingReply": null,
+      "bucket": "waiting",
+      "reason": null
     },
     {
       "repo": "acme/acme-web",
       "num": 418,
       "title": "Refactor: 결제 폼 상태를 리듀서로 정리",
       "url": "https://github.com/acme/acme-web/pull/418",
-      "created": "2026-08-07T02:39:27Z",
+      "created": "2026-08-07T03:28:11Z",
       "mergeable": "MERGEABLE",
       "reviewDecision": "REVIEW_REQUIRED",
       "mergeState": "BLOCKED",
       "approvals": [],
       "changesRequested": [],
       "unresolvedThreads": [],
-      "pendingReply": null
+      "pendingReply": null,
+      "bucket": "waiting",
+      "reason": null
     },
     {
       "repo": "acme/design-system",
       "num": 77,
       "title": "Feat: Toast 컴포넌트 variant 추가",
       "url": "https://github.com/acme/design-system/pull/77",
-      "created": "2026-08-09T14:39:27Z",
+      "created": "2026-08-09T15:28:11Z",
       "mergeable": "MERGEABLE",
       "reviewDecision": "REVIEW_REQUIRED",
       "mergeState": "BLOCKED",
       "approvals": [],
       "changesRequested": [],
       "unresolvedThreads": [],
-      "pendingReply": null
+      "pendingReply": null,
+      "bucket": "waiting",
+      "reason": null
     },
     {
       "repo": "acme/acme-web",
       "num": 405,
       "title": "Fix: 장바구니 수량 변경 시 합계가 갱신되지 않던 문제",
       "url": "https://github.com/acme/acme-web/pull/405",
-      "created": "2026-08-04T00:15:27Z",
+      "created": "2026-08-04T01:04:11Z",
       "mergeable": "MERGEABLE",
       "reviewDecision": "APPROVED",
       "mergeState": "CLEAN",
@@ -670,16 +676,18 @@
       "unresolvedThreads": [],
       "pendingReply": {
         "by": "monalisa",
-        "at": "2026-08-09T09:51:27Z",
+        "at": "2026-08-09T10:40:11Z",
         "snippet": "이거 배포 순서가 API 쪽 변경보다 먼저여야 하나요? 릴리스 노트에 적어둘게요."
-      }
+      },
+      "bucket": "action",
+      "reason": "답변 필요"
     },
     {
       "repo": "acme/api-gateway",
       "num": 149,
       "title": "Refactor: 재시도 정책을 미들웨어로 분리",
       "url": "https://github.com/acme/api-gateway/pull/149",
-      "created": "2026-08-06T02:39:27Z",
+      "created": "2026-08-06T03:28:11Z",
       "mergeable": "MERGEABLE",
       "reviewDecision": "CHANGES_REQUESTED",
       "mergeState": "BLOCKED",
@@ -690,14 +698,16 @@
         "hubot"
       ],
       "unresolvedThreads": [],
-      "pendingReply": null
+      "pendingReply": null,
+      "bucket": "action",
+      "reason": "변경 요청"
     },
     {
       "repo": "acme/acme-web",
       "num": 421,
       "title": "Chore: 사용하지 않는 아이콘 에셋 정리",
       "url": "https://github.com/acme/acme-web/pull/421",
-      "created": "2026-08-09T00:15:27Z",
+      "created": "2026-08-09T01:04:11Z",
       "mergeable": "MERGEABLE",
       "reviewDecision": "APPROVED",
       "mergeState": "CLEAN",
@@ -706,14 +716,16 @@
       ],
       "changesRequested": [],
       "unresolvedThreads": [],
-      "pendingReply": null
+      "pendingReply": null,
+      "bucket": "merge",
+      "reason": null
     },
     {
       "repo": "acme/api-gateway",
       "num": 156,
       "title": "Feat: 요청 로깅에 트레이스 ID 전파",
       "url": "https://github.com/acme/api-gateway/pull/156",
-      "created": "2026-08-07T21:51:27Z",
+      "created": "2026-08-07T22:40:11Z",
       "mergeable": "MERGEABLE",
       "reviewDecision": "APPROVED",
       "mergeState": "CLEAN",
@@ -723,7 +735,9 @@
       ],
       "changesRequested": [],
       "unresolvedThreads": [],
-      "pendingReply": null
+      "pendingReply": null,
+      "bucket": "merge",
+      "reason": null
     }
   ],
   "reviewedOpen": [
@@ -733,14 +747,14 @@
       "title": "Perf: 커넥션 풀 크기를 환경별로 분리",
       "url": "https://github.com/acme/api-gateway/pull/151",
       "author": "hubot",
-      "updated": "2026-08-09T21:51:27Z",
+      "updated": "2026-08-09T22:40:11Z",
       "threads": [
         {
           "path": "src/pool/config.ts",
           "resolved": false,
           "myPoint": "기본값을 8로 두면 스테이징에서 커넥션이 남지 않을 것 같은데, 근거가 있을까요?",
           "replyBy": "hubot",
-          "replyAt": "2026-08-09T21:51:27Z",
+          "replyAt": "2026-08-09T22:40:11Z",
           "reply": "부하 테스트에서 6까지 쓰는 걸 확인해서 여유를 둔 값입니다. 스테이징은 4로 낮추겠습니다.",
           "link": "https://github.com/acme/api-gateway/pull/151#discussion_r1"
         }
@@ -752,14 +766,14 @@
       "title": "Fix: Select 키보드 탐색이 그룹 헤더에서 멈추던 문제",
       "url": "https://github.com/acme/design-system/pull/74",
       "author": "monalisa",
-      "updated": "2026-08-08T07:27:27Z",
+      "updated": "2026-08-08T08:16:11Z",
       "threads": [
         {
           "path": "src/Select/useKeyboard.ts",
           "resolved": false,
           "myPoint": "헤더를 건너뛰는 대신 aria-disabled 를 주는 편이 스크린리더에 낫지 않을까요?",
           "replyBy": "monalisa",
-          "replyAt": "2026-08-08T07:27:27Z",
+          "replyAt": "2026-08-08T08:16:11Z",
           "reply": "그렇게 하면 NVDA 에서 항목 수가 어긋나더라고요. 일단 건너뛰기로 두고 별도 이슈로 남기겠습니다.",
           "link": "https://github.com/acme/design-system/pull/74#discussion_r2"
         }
@@ -825,30 +839,14 @@
   const NAMES = CONFIG.names || {};
   const who = login => NAMES[login] || login;
 
-  // 한 PR 은 한 구획에만 들어간다. 승인을 하나 받았어도 답할 것이 남아 있으면
-  // 그게 먼저다. 승인 개수를 세는 대신 GitHub 의 reviewDecision 을 쓴다.
-  // 브랜치 보호의 필요 승인 수까지 반영된 판정이라 "승인 1/2" 도 정확히 걸러진다.
-  const needsAction = p =>
-    p.reviewDecision === "CHANGES_REQUESTED"
-    || !!p.pendingReply
-    || p.unresolvedThreads.length > 0
-    || (p.reviewDecision === "APPROVED"
-        && (p.mergeState === "DIRTY" || p.mergeState === "BEHIND"));
+  // 분류는 pr-status.sh 가 이미 끝냈다. 여기서 다시 판정하지 않는다.
+  // 판정을 두 벌 두면 언젠가 어긋나고, 어긋난 쪽을 찾기가 어렵다.
+  const inBucket = b => DATA.mine.filter(p => p.bucket === b);
+  const actionReason = p => p.reason;
 
-  // 배지에 쓸 사유. 손이 많이 가는 것부터 본다.
-  const actionReason = p =>
-    p.reviewDecision === "CHANGES_REQUESTED" ? "변경 요청" :
-    p.mergeState === "DIRTY" ? "충돌 해결" :
-    p.mergeState === "BEHIND" ? "브랜치 업데이트" :
-    p.pendingReply ? "답변 필요" : "미해결 스레드";
-
-  const needReply = DATA.mine.filter(needsAction);
-
-  const readyToMerge = DATA.mine.filter(p =>
-    !needsAction(p) && p.reviewDecision === "APPROVED");
-
-  const mine = DATA.mine.filter(p =>
-    !needsAction(p) && p.reviewDecision !== "APPROVED");
+  const needReply = inBucket("action");
+  const readyToMerge = inBucket("merge");
+  const mine = inBucket("waiting");
 
   const reviewed = DATA.reviewedOpen.map(p => ({ ...p, author: who(p.author) }));
 

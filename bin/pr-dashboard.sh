@@ -55,9 +55,12 @@ done
 
 PIDFILE="$CACHE/server.pid"
 
-# macOS 의 `nc -z` 는 닫힌 포트에도 0 을 반환하는 경우가 있어 lsof 로 확인한다.
+# bash 내장 /dev/tcp 로 연결만 시도한다. 외부 명령에 기대지 않는 이유가 있다.
+# lsof 를 쓰던 때, GUI 에서 띄운 메뉴바 앱이 넘겨준 PATH 에는 /usr/sbin 이 없어서
+# lsof 를 찾지 못했다. 그러면 이 함수가 늘 false 가 되고, 멀쩡히 떠 있는 서버를
+# 없다고 판단해 새로 띄우려다 포트 충돌로 exit 1 로 끝난다. 브라우저는 열리지 않는다.
 # curl 로 찔러보는 방식은 요청마다 재수집이 돌아 5초씩 걸리므로 쓰지 않는다.
-server_up() { lsof -nP -iTCP:"$PORT" -sTCP:LISTEN -t >/dev/null 2>&1; }
+server_up() { (exec 3<>"/dev/tcp/127.0.0.1/$PORT") 2>/dev/null; }
 
 mkdir -p "$CACHE"
 # umask 는 앞으로 만들 것만 다스린다. 예전 버전이 644 로 남긴 것도 거둬들인다.

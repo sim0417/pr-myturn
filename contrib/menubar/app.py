@@ -22,8 +22,10 @@ STATUS = REPO / "bin" / "pr-status.sh"
 DASHBOARD = REPO / "bin" / "pr-dashboard.sh"
 
 # GUI 로 띄우면 로그인 셸의 PATH 를 물려받지 못해 gh 나 jq 를 찾지 못한다.
+# /usr/sbin 도 넣는다. lsof 같은 도구가 거기 있고, 빠지면 하위 스크립트가
+# 조용히 다른 길로 새기 때문이다.
 ENV = {**os.environ, "PATH": os.pathsep.join(
-    ["/opt/homebrew/bin", "/usr/local/bin", "/usr/bin", "/bin",
+    ["/opt/homebrew/bin", "/usr/local/bin", "/usr/bin", "/bin", "/usr/sbin",
      os.environ.get("PATH", "")])}
 
 CONFIG_PATH = pathlib.Path(
@@ -178,8 +180,10 @@ class Dashboard(rumps.App):
         subprocess.run(["open", sender.pr_url], env=ENV)
 
     def open_dashboard(self, _):
-        subprocess.Popen([str(DASHBOARD)], env=ENV,
-                         stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+        # 출력을 버리지 않는다. launchd 가 잡아 로그 파일에 남긴다. 예전에 여기서
+        # 출력을 DEVNULL 로 보내는 바람에, 대시보드가 뜨지 않는 이유가 로그 어디에도
+        # 남지 않았다.
+        subprocess.Popen([str(DASHBOARD)], env=ENV)
 
 
 def hide_dock_icon():

@@ -118,6 +118,24 @@ class DashboardWindow:
         NSApp.activateIgnoringOtherApps_(True)
         self._window.makeKeyAndOrderFront_(None)
 
+    def is_visible(self):
+        """창이 화면에 있나. 떠 있을 때만 자동으로 다시 읽기 위해 쓴다."""
+        return self._window is not None and bool(self._window.isVisible())
+
+    def reload(self, html_path):
+        """이미 떠 있는 창의 내용만 갈아끼운다. 앞으로 끌어내지는 않는다.
+
+        show() 와 달리 포커스를 뺏지 않는다. 5분마다 자동 갱신할 때 창이
+        다른 작업 위로 튀어나오면 성가시기만 하다.
+        """
+        if not self.is_visible():
+            return
+        path = pathlib.Path(html_path)
+        if path.is_file():
+            self._webview.loadFileURL_allowingReadAccessToURL_(
+                NSURL.fileURLWithPath_(str(path)),
+                NSURL.fileURLWithPath_(str(path.parent)))
+
     def close(self):
         if self._window is not None:
             self._window.orderOut_(None)

@@ -23,11 +23,25 @@ fi
 # 설정에서 값을 꺼낸다. 없으면 두 번째 인자를 기본값으로 쓴다.
 cfg() { printf '%s' "$CONFIG" | jq -r --arg d "$2" ".$1 // \$d"; }
 
-ME=$(gh api user --jq '.login')
-
 # 산출물이 모이는 곳. 대시보드 HTML, status.json, 머지분 답글 캐시가 여기 있다.
 CACHE="${PR_MYTURN_CACHE:-${XDG_CACHE_HOME:-$HOME/.cache}/pr-myturn}"
 STATUS_JSON="$CACHE/status.json"
+LOGIN_CACHE="$CACHE/login"
+
+# 내 GitHub 로그인. 예전에는 실행할 때마다 gh api user 로 물어봤는데 476ms 가
+# 걸렸고, 두 스크립트가 각각 부르니 왕복 한 번에 1초 가까이 날아갔다.
+# 계정을 바꾸지 않는 한 변하지 않는 값이라 받아두고 쓴다.
+# 계정을 갈아탔다면 이 파일을 지우거나 PR_MYTURN_LOGIN 으로 덮어쓴다.
+if [ -n "${PR_MYTURN_LOGIN:-}" ]; then
+  ME="$PR_MYTURN_LOGIN"
+elif [ -s "$LOGIN_CACHE" ]; then
+  ME=$(cat "$LOGIN_CACHE")
+else
+  ME=$(gh api user --jq '.login')
+  mkdir -p "$CACHE"
+  printf '%s' "$ME" > "$LOGIN_CACHE"
+  chmod 600 "$LOGIN_CACHE" 2>/dev/null || true
+fi
 
 # 에이전트가 읽는 파일. 사람이 보는 HTML 과 달리 마크업이 없어 그대로 넘길 수 있고,
 # 이미 수집해 둔 것을 읽으므로 GitHub 을 다시 부르지 않는다.

@@ -61,9 +61,18 @@ fetch() {
   done
 }
 
-RAW=$( { fetch "is:pr $SCOPE archived:false reviewed-by:$ME -author:$ME"
-         fetch "is:pr $SCOPE archived:false commenter:$ME -author:$ME"; } \
-       | jq -s 'unique_by(.url)' )
+# 두 검색은 서로를 기다릴 이유가 없다. 각각 0.7초쯤 걸리므로 나란히 돌린다.
+# (하나의 GraphQL 요청에 search 를 여러 개 넣어보기도 했는데, GitHub 이 그것을
+#  순차로 처리해서 오히려 느렸다. 병렬 HTTP 요청이 낫다.)
+raw_a="$CACHE/.replies-a.$$"; raw_b="$CACHE/.replies-b.$$"
+mkdir -p "$CACHE"
+trap 'rm -f "$raw_a" "$raw_b"' EXIT
+fetch "is:pr $SCOPE archived:false reviewed-by:$ME -author:$ME" > "$raw_a" &
+pid_a=$!
+fetch "is:pr $SCOPE archived:false commenter:$ME -author:$ME" > "$raw_b" &
+pid_b=$!
+wait "$pid_a"; wait "$pid_b"
+RAW=$(cat "$raw_a" "$raw_b" | jq -s 'unique_by(.url)')
 
 PARSED=$(printf '%s' "$RAW" | jq --arg me "$ME" --arg bots "$BOTS" \
   --argjson skips "$EXCLUDE_OWNERS" --argjson all "$SHOW_ALL" '

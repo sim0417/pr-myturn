@@ -1,8 +1,9 @@
 #!/usr/bin/env python3
 """메뉴바에 "지금 내 차례인 PR" 건수를 띄운다.
 
-대시보드를 열어봐야 아는 정보를 상시로 보이게 하는 것이 전부다. 수집은
-bin/pr-status.sh 를 그대로 호출하므로 판정 로직이 대시보드와 어긋나지 않는다.
+대시보드를 열어봐야 아는 정보를 상시로 보이게 한다. 주기적으로 깨어날 때
+bin/pr-dashboard.sh 를 그대로 호출해 배지·status.json·대시보드 HTML 을 한꺼번에
+만들어 둔다. 판정 로직을 따로 두지 않고, 창을 열 때 기다릴 일도 없앤다.
 
     python3 contrib/menubar/app.py
 
@@ -22,11 +23,10 @@ from PyObjCTools import AppHelper
 from window import DashboardWindow
 
 REPO = pathlib.Path(__file__).resolve().parents[2]
-STATUS = REPO / "bin" / "pr-status.sh"
 DASHBOARD = REPO / "bin" / "pr-dashboard.sh"
 
-# 수집할 때마다 여기에도 써 둔다. 에이전트는 GitHub 을 다시 부르지 않고 이 파일만
-# 읽으면 된다. 대시보드를 빌드할 때는 pr-dashboard.sh 가 리뷰 답글까지 채워 덮어쓴다.
+# 산출물은 전부 pr-dashboard.sh 가 쓴다. 앱은 배지를 그리려고 status.json 을
+# 읽고, 창에는 dashboard.html 을 띄운다.
 CACHE = pathlib.Path(
     os.environ.get("PR_MYTURN_CACHE")
     or pathlib.Path(os.environ.get("XDG_CACHE_HOME", pathlib.Path.home() / ".cache")) / "pr-myturn")
@@ -90,18 +90,28 @@ class Dashboard(rumps.App):
         threading.Thread(target=self._collect, daemon=True).start()
 
     def _collect(self):
+        """대시보드까지 통째로 만들어 둔다.
+
+        예전에는 배지에 필요한 만큼만(pr-status) 받고 HTML 은 열 때 만들었다.
+        그래서 창을 열 때마다 몇 초를 기다려야 했다. 어차피 주기적으로 깨어나는
+        김에 화면까지 만들어 두면, 열었을 때 기다릴 일이 없다.
+        """
         try:
-            out = subprocess.run(
-                [str(STATUS), "--json"], env=ENV, capture_output=True,
-                text=True, timeout=60, check=True).stdout
-            prs, error = json.loads(out), None
+            # 폴링 주기가 곧 수집 주기가 되도록 OPEN_TTL 을 눌러둔다. 그러지 않으면
+            # menubarPollSec 을 60초 밑으로 줄여도 스크립트가 캐시를 재사용해
+            # 설정이 먹지 않는다. 연타 방어는 collecting 플래그가 한다.
+            subprocess.run([str(DASHBOARD), "--no-open"],
+                           env={**ENV, "PR_DASHBOARD_OPEN_TTL": "0"},
+                           capture_output=True, text=True, timeout=180, check=True)
+            prs = json.loads(STATUS_JSON.read_text())["mine"]
+            error = None
         except subprocess.CalledProcessError as e:
             prs = None
             tail = (e.stderr or "").strip().splitlines()[-1:]
             error = (tail[0] if tail else "수집 실패")[:80]
         except subprocess.TimeoutExpired:
-            prs, error = None, "수집이 60초를 넘어 중단했습니다"
-        except (OSError, ValueError) as e:
+            prs, error = None, "수집이 180초를 넘어 중단했습니다"
+        except (OSError, ValueError, KeyError) as e:
             prs, error = None, str(e)[:80]
 
         AppHelper.callAfter(self._collected, prs, error)
@@ -112,38 +122,10 @@ class Dashboard(rumps.App):
         self.error = error
         if prs is not None:
             self.prs = prs
-            self.write_status()
+            # 창이 떠 있으면 새 내용으로 갈아끼운다. 앞으로 끌어내지는 않는다.
+            self.window.reload(DASHBOARD_HTML)
         self.fetched_at = time.localtime()
         self.render()
-
-    def write_status(self):
-        """에이전트가 읽는 파일. 5분마다 최신으로 유지된다.
-
-        리뷰 답글(reviewedOpen)은 수집이 무거워 여기서는 채우지 않는다.
-        대시보드를 열면 pr-dashboard.sh 가 그것까지 채워 덮어쓴다.
-        """
-        payload = {
-            "generatedAt": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
-            "counts": {
-                "action": len(self.need_reply),
-                "merge": len(self.ready_to_merge),
-                "waiting": len(self.waiting),
-                "reviewReplies": None,
-            },
-            "mine": self.prs,
-            "reviewedOpen": None,
-        }
-        try:
-            CACHE.mkdir(parents=True, exist_ok=True)
-            CACHE.chmod(0o700)
-            tmp = STATUS_JSON.with_suffix(".json.tmp")
-            tmp.write_text(json.dumps(payload, ensure_ascii=False, indent=2))
-            tmp.chmod(0o600)
-            tmp.replace(STATUS_JSON)
-        except OSError:
-            pass          # 배지를 띄우는 일이 더 중요하다. 여기서 앱을 멈추지 않는다
-
-    # 분류 --------------------------------------------------------------
 
     # 분류는 pr-status.sh 가 이미 끝냈다. 여기서 다시 판정하지 않는다.
     # 판정을 두 벌 두면 언젠가 어긋나고, 어긋난 쪽을 찾기가 어렵다.
@@ -263,7 +245,12 @@ class Dashboard(rumps.App):
             notify("대시보드를 열 수 없습니다",
                    "수집이 한 번도 끝나지 않았습니다" if ok else "수집에 실패했습니다")
             return
-        self.window.show(DASHBOARD_HTML)
+        # 이미 떠 있으면 내용만 갈아끼운다. show() 는 창을 앞으로 끌어내므로,
+        # 사용자가 그새 다른 창으로 옮겨갔다면 방해가 된다.
+        if self.window.is_visible():
+            self.window.reload(DASHBOARD_HTML)
+        else:
+            self.window.show(DASHBOARD_HTML)
 
 
 def hide_dock_icon():

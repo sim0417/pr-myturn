@@ -604,6 +604,15 @@
 
   <section>
     <div class="sec-head">
+      <h2>남의 PR — 리뷰 요청</h2>
+      <span class="count" id="c-req"></span>
+      <span class="desc">나에게 리뷰가 요청됨. 내 차례</span>
+    </div>
+    <div class="rows" id="req"></div>
+  </section>
+
+  <section>
+    <div class="sec-head">
       <h2>내가 리뷰한 PR — 답글 도착</h2>
       <span class="count" id="c-rev"></span>
       <span class="desc">내 지적에 리뷰이가 답한 미해결 스레드</span>
@@ -650,6 +659,11 @@
   const mine = inBucket("waiting");
 
   const reviewed = DATA.reviewedOpen.map(p => ({ ...p, author: who(p.author) }));
+
+  // 대기는 PR 을 연 시점이 아니라 나에게 요청이 온 시점부터 센다.
+  // 이 필드가 없던 때 만든 페이지(docs/demo.html 등)도 깨지지 않게 비어 있으면 빈 목록이다.
+  const requests = (DATA.reviewRequests || [])
+    .map(p => ({ ...p, author: who(p.author), created: p.requestedAt }));
 
   const archive = DATA.reviewedClosed.map(p => ({
     repo: p.repo, num: p.num, title: p.title, url: p.url, threads: p.threads.length
@@ -829,6 +843,11 @@
        "내 차례인 PR이 없습니다.");
   fill("ready", readyToMerge, { tone: ["var(--ready)", "var(--ready-soft)"], pill: "머지 가능" },
        "머지를 기다리는 PR이 없습니다.");
+  fill("req", requests, {
+         pill: p => p.unresolvedThreads ? "미해결 스레드 " + p.unresolvedThreads + "건" : "리뷰 요청",
+         ageFmt: d => d < 1 / 24 ? "방금 요청" :
+                      d < 1 ? Math.round(d * 24) + "시간 전 요청" : d.toFixed(1) + "일 전 요청" },
+       "나에게 요청된 리뷰가 없습니다.");
   reviewed.forEach(p => { p.created = p.threads[0] && p.threads[0].replyAt; });
   fill("rev", reviewed, { tone: ["var(--reply)", "var(--reply-soft)"], pill: "확인 필요",
          ageFmt: d => d < 1 ? "오늘 답글" : Math.round(d) + "일 전 답글" },
@@ -870,6 +889,11 @@
     { label: "머지 가능", n: readyToMerge.length, unit: "건",
       note: readyToMerge.length ? "승인 완료, 머지만 남음" : "머지 대기 중인 건 없음",
       tone: readyToMerge.length ? "var(--ready)" : "var(--muted)" },
+    { label: "리뷰 요청", n: requests.length, unit: "건",
+      note: requests.length
+        ? "가장 오래된 요청 " + Math.max(...requests.map(p => days(p.created))).toFixed(1) + "일"
+        : "요청된 리뷰 없음",
+      tone: requests.length ? "var(--reply)" : "var(--muted)" },
     { label: "내 리뷰 답글", n: reviewed.length, unit: "건",
       note: reviewed.length ? "리뷰이 반론에 확인 필요" : "미확인 답글 없음",
       tone: reviewed.length ? "var(--reply)" : "var(--muted)" }
@@ -888,6 +912,7 @@
   document.getElementById("c-wait").textContent = mine.length;
   document.getElementById("c-reply").textContent = needReply.length;
   document.getElementById("c-ready").textContent = readyToMerge.length;
+  document.getElementById("c-req").textContent = requests.length;
   document.getElementById("c-rev").textContent = reviewed.length;
   document.getElementById("c-arc").textContent = archive.length;
 

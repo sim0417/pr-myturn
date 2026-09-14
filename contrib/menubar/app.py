@@ -7,7 +7,7 @@ bin/pr-dashboard.sh 를 그대로 호출해 배지·status.json·대시보드 HT
 
     python3 contrib/menubar/app.py
 
-내 차례 = 응답 필요(내가 답할 것) + 머지 대기(내가 머지할 것).
+내 차례 = 응답 필요(내가 답할 것) + 리뷰 요청(내가 리뷰할 것) + 머지 대기(내가 머지할 것).
 리뷰 대기는 상대 차례이므로 배지에 넣지 않고 메뉴에서만 보여준다.
 """
 import json
@@ -67,6 +67,7 @@ class Dashboard(rumps.App):
         super().__init__("PR", quit_button="종료")
         self.poll_sec = int(config().get("menubarPollSec", 300))
         self.prs = []
+        self.requests = []
         self.error = None
         self.fetched_at = None
         self.last_pending = None      # 알림은 "늘어났을 때"만 띄우기 위한 직전 값
@@ -103,25 +104,29 @@ class Dashboard(rumps.App):
             subprocess.run([str(DASHBOARD), "--no-open"],
                            env={**ENV, "PR_DASHBOARD_OPEN_TTL": "0"},
                            capture_output=True, text=True, timeout=180, check=True)
-            prs = json.loads(STATUS_JSON.read_text())["mine"]
+            status = json.loads(STATUS_JSON.read_text())
+            prs, requests = status["mine"], status.get("reviewRequests") or []
             error = None
         except subprocess.CalledProcessError as e:
-            prs = None
+            prs = requests = None
             tail = (e.stderr or "").strip().splitlines()[-1:]
             error = (tail[0] if tail else "수집 실패")[:80]
         except subprocess.TimeoutExpired:
-            prs, error = None, "수집이 180초를 넘어 중단했습니다"
+            prs = requests = None
+            error = "수집이 180초를 넘어 중단했습니다"
         except (OSError, ValueError, KeyError) as e:
-            prs, error = None, str(e)[:80]
+            prs = requests = None
+            error = str(e)[:80]
 
-        AppHelper.callAfter(self._collected, prs, error)
+        AppHelper.callAfter(self._collected, prs, requests, error)
 
-    def _collected(self, prs, error):
+    def _collected(self, prs, requests, error):
         """메인 스레드. 여기서만 상태와 화면을 만진다."""
         self.collecting = False
         self.error = error
         if prs is not None:
             self.prs = prs
+            self.requests = requests
             # 창이 떠 있으면 새 내용으로 갈아끼운다. 앞으로 끌어내지는 않는다.
             self.window.reload(DASHBOARD_HTML)
         self.fetched_at = time.localtime()
@@ -154,9 +159,9 @@ class Dashboard(rumps.App):
         if self.error:
             self.title = "PR ?"
         else:
-            mine = len(self.need_reply) + len(self.ready_to_merge)
+            mine = len(self.need_reply) + len(self.requests) + len(self.ready_to_merge)
             self.title = f"PR {mine}" if mine else "PR"
-            self.announce(len(self.need_reply))
+            self.announce(len(self.need_reply) + len(self.requests))
 
         self.menu.clear()
         items = []
@@ -165,9 +170,10 @@ class Dashboard(rumps.App):
             items.append(rumps.MenuItem(f"수집 실패 — {self.error}"))
         else:
             items += self.section("내 차례", self.need_reply, self.action_reason)
+            items += self.section("리뷰 요청", self.requests)
             items += self.section("머지 가능", self.ready_to_merge)
             items += self.section("리뷰 대기", self.waiting)
-            if not self.prs:
+            if not self.prs and not self.requests:
                 items.append(rumps.MenuItem("열린 PR 이 없습니다"))
 
         items.append(rumps.separator)
@@ -196,9 +202,9 @@ class Dashboard(rumps.App):
         return out
 
     def announce(self, pending):
-        """답변 필요가 늘어난 순간에만 알린다. 같은 건으로 반복해 알리지 않는다."""
+        """답변 필요·리뷰 요청이 늘어난 순간에만 알린다. 같은 건으로 반복해 알리지 않는다."""
         if self.last_pending is not None and pending > self.last_pending:
-            notify("답변을 기다리는 PR", f"{pending}건 — 메뉴바에서 확인하세요")
+            notify("나를 기다리는 PR", f"{pending}건 — 메뉴바에서 확인하세요")
         self.last_pending = pending
 
     # 동작 --------------------------------------------------------------

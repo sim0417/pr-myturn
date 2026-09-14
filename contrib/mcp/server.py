@@ -23,6 +23,7 @@ PROTOCOL_VERSION = "2024-11-05"
 REPO = pathlib.Path(__file__).resolve().parents[2]
 PR_STATUS = REPO / "bin" / "pr-status.sh"
 PR_REPLIES = REPO / "bin" / "pr-review-replies.sh"
+PR_REQUESTS = REPO / "bin" / "pr-review-requests.sh"
 
 CACHE = pathlib.Path(
     os.environ.get("PR_MYTURN_CACHE")
@@ -64,6 +65,21 @@ TOOLS = [
             "않은 것을 준다. 항상 GitHub 을 호출하므로 몇 초 걸린다."),
         "inputSchema": {"type": "object", "properties": {}},
     },
+    {
+        "name": "pr_review_requests",
+        "description": (
+            "남의 PR 중 나에게 리뷰가 요청됐고 내가 아직 리뷰를 제출하지 않은 것을 준다. "
+            "requestedAt 은 나에게 요청이 온 시각, unresolvedThreads 는 이미 달린 "
+            "미해결 스레드 수(에이전트 1차 리뷰 지적 포함)다."),
+        "inputSchema": {
+            "type": "object",
+            "properties": {
+                "refresh": {
+                    "type": "boolean",
+                    "description": "캐시를 무시하고 GitHub 에서 새로 수집한다. 느리다."},
+            },
+        },
+    },
 ]
 
 
@@ -73,24 +89,33 @@ def run(cmd, timeout=120):
     return json.loads(p.stdout)
 
 
-def collect(refresh):
+def cached(key):
+    """캐시가 쓸 만하면 그 키의 값과 출처를, 아니면 None 을 준다."""
+    try:
+        age = time.time() - STATUS_JSON.stat().st_mtime
+        if age >= STALE_AFTER_SEC:
+            return None
+        data = json.loads(STATUS_JSON.read_text())
+    except (OSError, ValueError):
+        return None       # 캐시가 없거나 깨졌으면 그냥 새로 수집한다
+    if data.get(key) is None:
+        return None       # 이 키를 채우지 않은 옛 캐시다
+    return data[key], {"source": "cache", "ageSec": round(age),
+                       "generatedAt": data.get("generatedAt")}
+
+
+def collect(key, script, refresh):
     """캐시가 쓸 만하면 캐시를, 아니면 직접 수집한 결과를 준다."""
-    if not refresh and STATUS_JSON.is_file():
-        try:
-            age = time.time() - STATUS_JSON.stat().st_mtime
-            if age < STALE_AFTER_SEC:
-                data = json.loads(STATUS_JSON.read_text())
-                return data.get("mine", []), {"source": "cache",
-                                              "ageSec": round(age),
-                                              "generatedAt": data.get("generatedAt")}
-        except (OSError, ValueError):
-            pass          # 캐시가 깨졌으면 그냥 새로 수집한다
-    return run([str(PR_STATUS), "--json"]), {"source": "github"}
+    hit = None if refresh else cached(key)
+    return hit or (run([str(script), "--json"]), {"source": "github"})
 
 
 def call_tool(name, args):
+    if name == "pr_review_requests":
+        requests, meta = collect("reviewRequests", PR_REQUESTS, bool(args.get("refresh")))
+        return {"meta": meta, "count": len(requests), "requests": requests}
     if name == "pr_status":
-        prs, meta = collect(bool(args.get("refresh")))
+        prs, meta = collect("mine", PR_STATUS, bool(args.get("refresh")))
         wanted = args.get("bucket")
         if wanted:
             prs = [p for p in prs if p.get("bucket") == wanted]

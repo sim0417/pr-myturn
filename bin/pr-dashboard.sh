@@ -59,16 +59,19 @@ out_age=$(age_of "$OUT")
 if [ "$FORCE_FULL" != true ] && [ "$out_age" -lt "$OPEN_TTL" ]; then
   printf '최근 %s초 전 데이터를 재사용합니다 (OPEN_TTL=%s).\n' "$out_age" "$OPEN_TTL" >&2
 else
-  # 둘은 서로를 기다릴 이유가 없다. 각각 2~3초씩 걸리므로 나란히 돌리면
+  # 셋은 서로를 기다릴 이유가 없다. 각각 1~3초씩 걸리므로 나란히 돌리면
   # 대기 시간이 느린 쪽 하나로 줄어든다.
-  mine_f="$CACHE/.mine.$$"; replies_f="$CACHE/.replies.$$"
-  trap 'rm -f "$mine_f" "$replies_f"' EXIT
+  mine_f="$CACHE/.mine.$$"; replies_f="$CACHE/.replies.$$"; requests_f="$CACHE/.requests.$$"
+  trap 'rm -f "$mine_f" "$replies_f" "$requests_f"' EXIT
   "$BIN/pr-status.sh" --json > "$mine_f" & p_mine=$!
   "$BIN/pr-review-replies.sh" --json > "$replies_f" & p_replies=$!
+  "$BIN/pr-review-requests.sh" --json > "$requests_f" & p_requests=$!
   wait "$p_mine" || { echo "내 PR 수집 실패" >&2; exit 1; }
   wait "$p_replies" || { echo "리뷰 답글 수집 실패" >&2; exit 1; }
+  wait "$p_requests" || { echo "리뷰 요청 수집 실패" >&2; exit 1; }
   mine=$(cat "$mine_f")
   replies_open=$(cat "$replies_f")
+  requests=$(cat "$requests_f")
 
   closed_age=$(age_of "$CLOSED_CACHE")
   if [ "$FORCE_FULL" = true ] || [ "$closed_age" -ge "$CLOSED_TTL" ]; then
@@ -83,17 +86,19 @@ else
     --argjson mine "$mine" \
     --argjson open "$replies_open" \
     --argjson closed "$(cat "$CLOSED_CACHE")" \
+    --argjson requests "$requests" \
     --argjson config "$CONFIG" \
     --arg now "$(date -u +%Y-%m-%dT%H:%M:%SZ)" \
     --argjson closedAge "$closed_age" \
     '{generatedAt: $now, closedAgeSec: $closedAge,
       mine: $mine, reviewedOpen: $open, reviewedClosed: $closed,
+      reviewRequests: $requests,
       config: { names: ($config.names // {}),
                 displayName: ($config.displayName // ""),
                 reminderCc: ($config.reminderCc // ""),
                 excludeNote: ($config.excludeOwners // [] | join(", ")) }}')
 
-  write_status "$mine" "$replies_open"
+  write_status "$mine" "$replies_open" "$requests"
 
   # __DATA__ 치환은 python 으로 한다. sed 는 개행·백슬래시에서 깨진다.
   DATA="$DATA" TEMPLATE="$TEMPLATE" OUT="$OUT" python3 - <<'PY'
@@ -115,8 +120,9 @@ data = (os.environ["DATA"]
 pathlib.Path(os.environ["OUT"]).write_text(tpl.replace("__DATA__", data, 1))
 PY
 
-  printf '갱신 — 내 PR %s건, 내 리뷰 답글 %s건 (머지분 캐시 %s초 전)\n' \
+  printf '갱신 — 내 PR %s건, 리뷰 요청 %s건, 내 리뷰 답글 %s건 (머지분 캐시 %s초 전)\n' \
     "$(printf '%s' "$mine" | jq 'length')" \
+    "$(printf '%s' "$requests" | jq 'length')" \
     "$(printf '%s' "$replies_open" | jq 'length')" \
     "$closed_age" >&2
 fi

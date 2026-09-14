@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# 세 스크립트가 공유하는 설정 로딩.
+# 스크립트들이 공유하는 설정 로딩.
 #
 # 설정 파일은 없어도 된다. 없으면 표시 이름은 GitHub 로그인 그대로 쓰고,
 # 제외 목록은 비어 있는 상태로 동작한다. 개인 정보를 코드에 두지 않기 위한 구조다.
@@ -45,19 +45,21 @@ fi
 
 # 에이전트가 읽는 파일. 사람이 보는 HTML 과 달리 마크업이 없어 그대로 넘길 수 있고,
 # 이미 수집해 둔 것을 읽으므로 GitHub 을 다시 부르지 않는다.
-# reviewedOpen 은 대시보드를 빌드할 때만 채워진다(수집이 무겁다). 없으면 null 이다.
+# reviewedOpen·reviewRequests 는 대시보드를 빌드할 때만 채워진다. 없으면 null 이다.
 write_status() {
-  local mine="$1" reviewed="${2:-null}"
+  local mine="$1" reviewed="${2:-null}" requests="${3:-null}"
   mkdir -p "$CACHE"
-  jq -n --argjson mine "$mine" --argjson reviewed "$reviewed" \
+  jq -n --argjson mine "$mine" --argjson reviewed "$reviewed" --argjson requests "$requests" \
      --arg now "$(date -u +%Y-%m-%dT%H:%M:%SZ)" '
     { generatedAt: $now,
       counts: { action:  ([ $mine[] | select(.bucket=="action")  ] | length),
                 merge:   ([ $mine[] | select(.bucket=="merge")   ] | length),
                 waiting: ([ $mine[] | select(.bucket=="waiting") ] | length),
-                reviewReplies: (if $reviewed == null then null else ($reviewed | length) end) },
+                reviewReplies: (if $reviewed == null then null else ($reviewed | length) end),
+                reviewRequests: (if $requests == null then null else ($requests | length) end) },
       mine: $mine,
-      reviewedOpen: $reviewed }' > "$STATUS_JSON.tmp" \
+      reviewedOpen: $reviewed,
+      reviewRequests: $requests }' > "$STATUS_JSON.tmp" \
     && mv "$STATUS_JSON.tmp" "$STATUS_JSON"
   chmod 600 "$STATUS_JSON" 2>/dev/null || true
 }

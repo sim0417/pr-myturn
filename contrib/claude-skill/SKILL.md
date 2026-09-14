@@ -38,9 +38,21 @@ cat ~/.cache/pr-myturn/status.json
 
 `reason` 은 `변경 요청` / `충돌 해결` / `브랜치 업데이트` / `답변 필요` / `미해결 스레드` 중 하나다.
 
+## 남의 PR — 리뷰 요청
+
+`status.json` 의 `reviewRequests` 는 나에게 리뷰가 요청됐고 아직 리뷰를 제출하지 않은 남의 PR 이다.
+`mine` 과 겹치지 않으며, 이것도 **내 차례**다. 비어 있거나 `null` 이면 직접 수집한다.
+
+```sh
+~/.cache/pr-myturn/../../projects/pr-myturn/bin/pr-review-requests.sh --json
+```
+
+`requestedAt` 은 나에게 요청이 온 시각(대기 일수는 이걸로 센다), `unresolvedThreads` 는 이미 달린
+미해결 스레드 수다. 에이전트 1차 리뷰의 지적도 여기에 포함된다.
+
 ## 어떻게 답하나
 
-- **`action` 부터 말한다.** 그게 사용자가 알고 싶은 것이다.
+- **`action` 과 `reviewRequests` 부터 말한다.** 그게 사용자가 알고 싶은 것이다.
 - 건수만 나열하지 말고 **무엇을 해야 하는지** 말한다. "1건 있습니다" 보다
   "classic-backoffice#1677 에 변경 요청이 있습니다. HyukjoonLee 가 P1 로 지적한 게 미해결입니다" 가 낫다.
 - `action` 이 비어 있으면 그 사실을 먼저 말한다. 이어서 `merge` 를 짚는다.

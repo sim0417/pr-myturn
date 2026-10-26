@@ -63,9 +63,20 @@ def save_config(cfg):
     target.parent.mkdir(parents=True, exist_ok=True)
     tmp = target.with_name(target.name + ".tmp")
     fd = os.open(tmp, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600)
-    with os.fdopen(fd, "w") as f:
-        f.write(json.dumps(cfg, ensure_ascii=False, indent=2) + "\n")
-    os.replace(tmp, target)
+    os.fchmod(fd, 0o600)     # 예전에 남은 tmp 가 있으면 O_CREAT 의 권한이 먹지 않는다
+    try:
+        with os.fdopen(fd, "w") as f:
+            f.write(json.dumps(cfg, ensure_ascii=False, indent=2) + "\n")
+        os.replace(tmp, target)
+    except OSError:
+        tmp.unlink(missing_ok=True)
+        raise
+
+
+def excluded_repos(cfg):
+    """리마인드 제외 목록. 모양이 틀리면 lib/reminder.jq 처럼 없는 것으로 친다."""
+    v = cfg.get("reminderExcludeRepos")
+    return [r for r in v if isinstance(r, str)] if isinstance(v, list) else []
 
 
 def notify(title, message):
@@ -230,7 +241,7 @@ class Dashboard(rumps.App):
         """리마인드 복사와, 리마인드에서 뺄 저장소를 고르는 하위 메뉴."""
         # 고를 수 있는 저장소 = 리마인드에 들어갈 수 있는 PR 의 저장소 + 이미 뺀 것.
         # 뺀 저장소의 PR 이 다 닫혀도 목록에 남아야 다시 넣을 수 있다.
-        excluded = config().get("reminderExcludeRepos") or []
+        excluded = excluded_repos(config())
         repos = []
         for p in self.waiting + self.ready_to_merge:
             if p["repo"] not in repos:
@@ -275,11 +286,13 @@ class Dashboard(rumps.App):
         try:
             out = subprocess.run([str(REMINDER), "--json"], env=ENV,
                                  capture_output=True, text=True, timeout=10, check=True)
-            wait, error = json.loads(out.stdout).get("wait"), None
+            wait, error = json.loads(out.stdout)["wait"], None
+            if wait is not None:
+                wait = {"count": wait["count"], "text": wait["text"], "html": wait.get("html")}
         except subprocess.CalledProcessError as e:
             tail = (e.stderr or "").strip().splitlines()[-1:]
             wait, error = None, (tail[0] if tail else "문구 생성 실패")[:80]
-        except (subprocess.TimeoutExpired, OSError, ValueError) as e:
+        except Exception as e:  # noqa: BLE001 — 스레드가 조용히 죽으면 알림조차 안 뜬다
             wait, error = None, str(e)[:80]
         AppHelper.callAfter(self._copy_reminder, wait, error)
 
@@ -302,7 +315,7 @@ class Dashboard(rumps.App):
         except (OSError, ValueError) as e:
             notify("설정 파일을 읽을 수 없습니다", str(e)[:80])
             return
-        excluded = cfg.get("reminderExcludeRepos") or []
+        excluded = excluded_repos(cfg)
         repo = sender.repo
         excluded = [r for r in excluded if r != repo] if repo in excluded else excluded + [repo]
         cfg["reminderExcludeRepos"] = excluded

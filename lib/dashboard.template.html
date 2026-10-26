@@ -716,12 +716,12 @@
 
   // file:// 로 열면 navigator.clipboard 가 막히므로 execCommand 로 물러선다.
   async function copyText(text, html) {
+    if (html && copyRich(text, html)) return true;
     if (html && native) {
-      // WKWebView 는 선택 영역 없이 copy 이벤트를 쏘지 않을 수 있다. 앱이 직접 싣는다.
+      // WKWebView 는 선택 영역 없이 copy 이벤트를 쏘지 않을 수 있다. 그때는 앱이 직접 싣는다.
       native.postMessage({ copy: { text, html } });
       return true;
     }
-    if (html && copyRich(text, html)) return true;
     try {
       if (navigator.clipboard && window.isSecureContext) {
         await navigator.clipboard.writeText(text);

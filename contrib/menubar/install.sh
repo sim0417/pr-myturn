@@ -2,10 +2,14 @@
 # 메뉴바 앱을 설치하고 로그인 시 자동으로 뜨도록 등록한다.
 #
 #   install.sh              설치 후 바로 실행
-#   install.sh --uninstall  등록 해제 후 venv 삭제
+#   install.sh --uninstall  등록 해제 후 venv·런처 삭제
 #
 # 터미널에서 그냥 실행해도 메뉴바에 뜨지 않는다. macOS 는 GUI 세션에 속한
 # 프로세스만 상태 아이템을 그리기 때문이다. 그래서 launchd 에 등록한다.
+#
+# ~/Applications 에 런처 앱도 둔다. 껐다 다시 켤 때 터미널 없이 Spotlight·
+# Launchpad 에서 열 수 있게 하기 위해서다. 런처는 launchd 서비스를 다시 띄울
+# 뿐이라 두 개가 겹쳐 뜨지 않는다.
 set -euo pipefail
 
 HERE="$(cd -P "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -13,11 +17,12 @@ LABEL="com.pr-myturn.menubar"
 PLIST="$HOME/Library/LaunchAgents/$LABEL.plist"
 VENV="$HERE/.venv"
 LOG="$HOME/Library/Logs/pr-menubar.log"
+LAUNCHER="$HOME/Applications/PR MyTurn.app"
 
 if [ "${1:-}" = "--uninstall" ]; then
   launchctl bootout "gui/$UID/$LABEL" 2>/dev/null || true
   rm -f "$PLIST"
-  rm -rf "$VENV"
+  rm -rf "$VENV" "$LAUNCHER"
   echo "제거했습니다. 로그는 남아 있습니다: $LOG"
   exit 0
 fi
@@ -44,7 +49,9 @@ cat > "$PLIST" <<EOF
     <string>$HERE/app.py</string>
   </array>
   <key>RunAtLoad</key><true/>
-  <key>KeepAlive</key><false/>
+  <!-- 비정상 종료면 다시 띄우고, 메뉴의 "종료"(정상 종료)면 꺼진 채로 둔다 -->
+  <key>KeepAlive</key>
+  <dict><key>SuccessfulExit</key><false/></dict>
   <key>StandardOutPath</key><string>$LOG</string>
   <key>StandardErrorPath</key><string>$LOG</string>
   <key>EnvironmentVariables</key>
@@ -63,7 +70,34 @@ for _ in $(seq 1 40); do
 done
 launchctl bootstrap "gui/$UID" "$PLIST"
 
+# 런처 앱. 실행 파일은 셸 스크립트 하나다. 서명·빌드를 관리할 필요가 없다.
+# LSUIElement 라 Dock 에 아이콘이 남지 않는다.
+rm -rf "$LAUNCHER"
+mkdir -p "$LAUNCHER/Contents/MacOS"
+cat > "$LAUNCHER/Contents/Info.plist" <<EOF
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+  <key>CFBundleName</key><string>PR MyTurn</string>
+  <key>CFBundleIdentifier</key><string>com.pr-myturn.launcher</string>
+  <key>CFBundleExecutable</key><string>launch</string>
+  <key>CFBundlePackageType</key><string>APPL</string>
+  <key>CFBundleShortVersionString</key><string>1.0</string>
+  <key>LSUIElement</key><true/>
+</dict>
+</plist>
+EOF
+cat > "$LAUNCHER/Contents/MacOS/launch" <<EOF
+#!/bin/bash
+# 메뉴바 앱을 (다시) 띄운다. 등록이 풀려 있으면 다시 등록한다.
+launchctl kickstart -k "gui/\$(id -u)/$LABEL" 2>/dev/null \\
+  || launchctl bootstrap "gui/\$(id -u)" "$PLIST"
+EOF
+chmod +x "$LAUNCHER/Contents/MacOS/launch"
+plutil -lint "$LAUNCHER/Contents/Info.plist" >/dev/null
+
 echo "설치했습니다. 메뉴바에 'PR' 이 뜨기까지 몇 초 걸립니다."
 echo "  로그      $LOG"
-echo "  다시 시작 launchctl kickstart -k gui/$UID/$LABEL"
+echo "  다시 시작 Spotlight 에서 'PR MyTurn' 실행 (= launchctl kickstart -k gui/$UID/$LABEL)"
 echo "  제거      $HERE/install.sh --uninstall"

@@ -129,6 +129,11 @@ chmod 600 ~/.config/pr-dashboard/config.json
 `gh`, `jq`, `python3` 만 있으면 됩니다. 전용 가상환경에 [rumps](https://github.com/jaredks/rumps)
 를 받고 launchd 에 등록해 로그인할 때마다 뜹니다.
 
+**껐다 다시 켤 때는 터미널이 필요 없습니다.** 설치하면 `~/Applications/PR MyTurn.app` 런처가
+생기므로 Spotlight(`⌘Space` → `PR MyTurn`)나 Launchpad 에서 실행하면 됩니다. 이미 떠 있으면
+다시 시작합니다. 비정상 종료되면 launchd 가 알아서 다시 띄우고, 메뉴의 "종료" 로 끈 경우에만
+꺼진 채로 남습니다.
+
 ```
 PR 6          ← 응답 필요 + 리뷰 요청 + 머지 가능 건수
   내 차례 1건
@@ -153,7 +158,7 @@ PR 6          ← 응답 필요 + 리뷰 요청 + 머지 가능 건수
   `config.json` 의 `menubarPollSec` 으로 주기를 바꿉니다.
 - 수집은 `bin/pr-status.sh` 를 그대로 호출하므로 판정이 대시보드와 어긋나지 않습니다.
 
-제거는 `./contrib/menubar/install.sh --uninstall` 입니다.
+제거는 `./contrib/menubar/install.sh --uninstall` 입니다(런처 앱도 함께 지웁니다).
 
 터미널에서 `python3 app.py` 로 직접 실행하면 프로세스는 뜨지만 **메뉴바에는 나타나지 않습니다.**
 macOS 는 GUI 세션에 속한 프로세스만 상태 아이템을 그리기 때문이며, `install.sh` 가 launchd 에

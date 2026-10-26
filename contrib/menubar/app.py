@@ -20,7 +20,7 @@ import time
 import rumps
 from PyObjCTools import AppHelper
 
-from window import DashboardWindow
+from window import DashboardWindow, copy_to_clipboard
 
 REPO = pathlib.Path(__file__).resolve().parents[2]
 DASHBOARD = REPO / "bin" / "pr-dashboard.sh"
@@ -55,22 +55,17 @@ def config():
 
 
 def save_config(cfg):
-    """설정 파일을 고쳐 쓴다. 팀원 실명이 담기므로 소유자 전용 권한을 유지한다."""
-    CONFIG_PATH.parent.mkdir(parents=True, exist_ok=True)
-    tmp = CONFIG_PATH.with_suffix(".tmp")
-    tmp.write_text(json.dumps(cfg, ensure_ascii=False, indent=2) + "\n")
-    tmp.chmod(0o600)
-    tmp.replace(CONFIG_PATH)
+    """설정 파일을 고쳐 쓴다. 팀원 실명이 담기므로 처음부터 소유자 전용으로 만든다.
 
-
-def copy_to_clipboard(text, html):
-    """평문과 HTML 을 함께 싣는다. 슬랙은 HTML 쪽 멘션 링크를 보고 멘션을 만든다."""
-    from AppKit import NSPasteboard, NSPasteboardTypeHTML, NSPasteboardTypeString
-    pb = NSPasteboard.generalPasteboard()
-    pb.clearContents()
-    pb.setString_forType_(text, NSPasteboardTypeString)
-    if html:
-        pb.setString_forType_(html, NSPasteboardTypeHTML)
+    심볼릭 링크(dotfiles 등)로 걸어 뒀다면 링크가 아니라 원본을 고친다.
+    """
+    target = CONFIG_PATH.resolve()
+    target.parent.mkdir(parents=True, exist_ok=True)
+    tmp = target.with_name(target.name + ".tmp")
+    fd = os.open(tmp, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600)
+    with os.fdopen(fd, "w") as f:
+        f.write(json.dumps(cfg, ensure_ascii=False, indent=2) + "\n")
+    os.replace(tmp, target)
 
 
 def notify(title, message):
@@ -92,6 +87,7 @@ class Dashboard(rumps.App):
         self.fetched_at = None
         self.last_pending = None      # 알림은 "늘어났을 때"만 띄우기 위한 직전 값
         self.collecting = False
+        self.recollect = False        # 수집 중에 다시 요청이 오면 끝난 뒤 한 번 더 돈다
         self.building = False
         self.window = DashboardWindow(on_refresh=self.refresh_dashboard)
         self.timer = rumps.Timer(self.tick, self.poll_sec)
@@ -106,7 +102,11 @@ class Dashboard(rumps.App):
 
     def tick(self, _):
         if self.collecting:
-            return          # 앞선 수집이 아직이면 겹쳐 부르지 않는다
+            # 겹쳐 부르지 않는다. 다만 설정을 바꾼 직후의 요청은 진행 중인 수집이
+            # 옛 설정을 읽었을 수 있으므로 버리지 않고 끝난 뒤 한 번 더 돈다.
+            if _ == "config":
+                self.recollect = True
+            return
         self.collecting = True
         threading.Thread(target=self._collect, daemon=True).start()
 
@@ -151,6 +151,9 @@ class Dashboard(rumps.App):
             self.window.reload(DASHBOARD_HTML)
         self.fetched_at = time.localtime()
         self.render()
+        if self.recollect:
+            self.recollect = False
+            self.tick("config")
 
     # 분류는 pr-status.sh 가 이미 끝냈다. 여기서 다시 판정하지 않는다.
     # 판정을 두 벌 두면 언젠가 어긋나고, 어긋난 쪽을 찾기가 어렵다.
@@ -237,21 +240,16 @@ class Dashboard(rumps.App):
             return []
 
         out = []
-        if any(not self.is_excluded(p["repo"], excluded) for p in self.waiting):
+        if any(p["repo"] not in excluded for p in self.waiting):
             out.append(rumps.MenuItem("리마인드 메시지 복사", callback=self.copy_reminder))
         picker = rumps.MenuItem("리마인드에서 뺄 저장소")
         for repo in repos:
             item = rumps.MenuItem(repo, callback=self.toggle_exclude)
-            item.state = int(self.is_excluded(repo, excluded))
+            item.state = int(repo in excluded)
             item.repo = repo
             picker.add(item)
         out.append(picker)
         return out
-
-    @staticmethod
-    def is_excluded(repo, excluded):
-        # lib/reminder.jq 와 같은 규칙: "owner/repo" 또는 "repo" 로 적을 수 있다.
-        return repo in excluded or repo.split("/")[-1] in excluded
 
     def announce(self, pending):
         """답변 필요·리뷰 요청이 늘어난 순간에만 알린다. 같은 건으로 반복해 알리지 않는다."""
@@ -269,13 +267,25 @@ class Dashboard(rumps.App):
 
         status.json 에서 바로 만드므로 GitHub 을 다시 부르지 않는다. 문구는
         pr-reminder.sh(lib/reminder.jq) 하나가 만든다. 여기서 따로 조립하지 않는다.
+        스크립트는 스레드에서 돌리고 클립보드만 메인 스레드에서 만진다.
         """
+        threading.Thread(target=self._make_reminder, daemon=True).start()
+
+    def _make_reminder(self):
         try:
             out = subprocess.run([str(REMINDER), "--json"], env=ENV,
                                  capture_output=True, text=True, timeout=10, check=True)
-            wait = json.loads(out.stdout).get("wait")
-        except (subprocess.CalledProcessError, subprocess.TimeoutExpired, ValueError) as e:
-            notify("리마인드 복사 실패", str(e)[:80])
+            wait, error = json.loads(out.stdout).get("wait"), None
+        except subprocess.CalledProcessError as e:
+            tail = (e.stderr or "").strip().splitlines()[-1:]
+            wait, error = None, (tail[0] if tail else "문구 생성 실패")[:80]
+        except (subprocess.TimeoutExpired, OSError, ValueError) as e:
+            wait, error = None, str(e)[:80]
+        AppHelper.callAfter(self._copy_reminder, wait, error)
+
+    def _copy_reminder(self, wait, error):
+        if error:
+            notify("리마인드 복사 실패", error)
             return
         if not wait:
             notify("리마인드 복사", "리마인드할 PR 이 없습니다")
@@ -294,10 +304,7 @@ class Dashboard(rumps.App):
             return
         excluded = cfg.get("reminderExcludeRepos") or []
         repo = sender.repo
-        if self.is_excluded(repo, excluded):
-            excluded = [r for r in excluded if r not in (repo, repo.split("/")[-1])]
-        else:
-            excluded.append(repo)
+        excluded = [r for r in excluded if r != repo] if repo in excluded else excluded + [repo]
         cfg["reminderExcludeRepos"] = excluded
         try:
             save_config(cfg)
@@ -306,7 +313,7 @@ class Dashboard(rumps.App):
             return
         self.render()
         # 대시보드에 박힌 문구도 새 제외 목록으로 다시 만든다.
-        self.tick(None)
+        self.tick("config")
 
     def open_dashboard(self, _):
         """있는 화면을 바로 띄우고, 갱신은 뒤에서 한다.

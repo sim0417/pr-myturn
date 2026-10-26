@@ -10,6 +10,7 @@ import pathlib
 
 import objc
 from AppKit import (NSApp, NSBackingStoreBuffered, NSMakeRect, NSObject,
+                    NSPasteboard, NSPasteboardTypeHTML, NSPasteboardTypeString,
                     NSScreen, NSWindow, NSWindowStyleMaskClosable,
                     NSWindowStyleMaskMiniaturizable, NSWindowStyleMaskResizable,
                     NSWindowStyleMaskTitled, NSWorkspace)
@@ -42,10 +43,23 @@ class NavigationDelegate(NSObject):
         handler(0)              # WKNavigationActionPolicyCancel
 
 
+def copy_to_clipboard(text, html=None):
+    """평문과 HTML 을 함께 싣는다. 슬랙은 HTML 쪽 멘션 링크를 보고 멘션을 만든다."""
+    pb = NSPasteboard.generalPasteboard()
+    pb.clearContents()
+    pb.setString_forType_(text, NSPasteboardTypeString)
+    if html:
+        pb.setString_forType_(html, NSPasteboardTypeHTML)
+
+
 class MessageHandler(NSObject):
     """페이지에서 온 요청을 앱으로 넘긴다.
 
-    지금은 새로고침 하나뿐이다. 서버가 있던 시절에는 브라우저 새로고침이
+    새로고침과 복사 두 가지다. 복사를 앱이 맡는 이유: WKWebView 는 선택 영역이
+    없으면 execCommand("copy") 의 copy 이벤트를 쏘지 않을 수 있어, 페이지
+    혼자서는 슬랙 멘션용 HTML 을 클립보드에 싣는다고 장담할 수 없다.
+
+    새로고침은 서버가 있던 시절에는 브라우저 새로고침이
     곧 재수집이었는데, 서버를 걷어내면서 그 경로가 사라졌다. 창을 열어둔 채
     최신 상태를 보려면 페이지가 앱에게 말을 걸 수 있어야 한다.
     """
@@ -58,8 +72,14 @@ class MessageHandler(NSObject):
         return self
 
     def userContentController_didReceiveScriptMessage_(self, _controller, message):
-        if message.body() == "refresh" and self._callback:
-            self._callback()
+        body = message.body()
+        if body == "refresh":
+            if self._callback:
+                self._callback()
+        elif hasattr(body, "get") and body.get("copy") is not None:
+            # 객체는 NSDictionary 로 오고, PyObjC 가 dict 처럼 읽게 해 준다.
+            data = body["copy"]
+            copy_to_clipboard(str(data.get("text") or ""), data.get("html"))
 
 
 class DashboardWindow:

@@ -108,7 +108,7 @@ chmod 600 ~/.config/pr-dashboard/config.json
 | `bots` | 코멘트를 무시할 봇 계정 | github-actions, dependabot, codecov, renovate |
 | `reminderCc` | 슬랙 리마인드 문구 끝에 붙일 멘션. `[{"name": "홍길동", "slackId": "U0123ABCD"}]` 처럼 적으면 붙여넣었을 때 진짜 멘션이 된다. 문자열은 평문으로만 붙는다 | 없음 |
 | `slackWorkspace` | 슬랙 워크스페이스 주소의 앞부분(`acme` → `acme.slack.com`). 멘션에 필요하다 — 다르면 일반 링크로 들어간다 | 없음 |
-| `reminderExcludeRepos` | 리마인드 문구에서 뺄 저장소(`owner/repo` 또는 `repo`). 대시보드·배지에는 그대로 나온다. 메뉴바의 "리마인드에서 뺄 저장소" 로도 고를 수 있다 | `[]` |
+| `reminderExcludeRepos` | 리마인드 문구에서 뺄 저장소(`owner/repo`). 대시보드·배지에는 그대로 나온다. 메뉴바의 "리마인드에서 뺄 저장소" 로도 고를 수 있다 | `[]` |
 | `closedWithinDays` | 머지된 PR을 며칠까지 거슬러 볼지 | 30 |
 | `approvalWindowSec` | 승인과 한 묶음으로 볼 코멘트 시간차 | 600 |
 

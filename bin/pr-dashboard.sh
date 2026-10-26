@@ -83,7 +83,7 @@ else
 
   # 리마인드 문구는 메뉴바와 같은 생성기에서 만든다. 두 벌로 두면 언젠가 어긋난다.
   reminders=$(jq -n --argjson mine "$mine" --argjson config "$CONFIG" '{mine: $mine, config: $config}' \
-              | jq -f "$LIB/reminder.jq")
+              | jq -f "$LIB/reminder.jq") || { echo "리마인드 문구를 만들지 못했습니다" >&2; reminders='{}'; }
 
   # 표시 이름·리마인드 문구 같은 개인 설정은 코드가 아니라 설정 파일에서 온다.
   DATA=$(jq -n \
@@ -101,7 +101,8 @@ else
       config: { names: ($config.names // {}),
                 displayName: ($config.displayName // ""),
                 excludeNote: ($config.excludeOwners // [] | join(", ")),
-                reminderExcludeNote: ($config.reminderExcludeRepos // [] | join(", ")) }}')
+                reminderExcludeNote: ($config.reminderExcludeRepos
+                                      | if type == "array" then map(strings) | join(", ") else "" end) }}')
 
   write_status "$mine" "$replies_open" "$requests"
 

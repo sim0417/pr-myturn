@@ -10,8 +10,10 @@
 
 def short: split("/") | last;
 
-# 제외 목록은 "owner/repo" 또는 "repo" 둘 다 받는다.
-def excluded($ex): . as $r | any($ex[]; . == $r or . == ($r | short));
+def excluded($ex): . as $r | any($ex[]; . == $r);
+
+# 설정 오타 하나로 수집 전체가 죽지 않도록, 모양이 틀린 값은 없는 것으로 친다.
+def strList: if type == "array" then map(select(type == "string")) else [] end;
 
 # 레포는 처음 나온 순서대로 묶는다. group_by 는 이름순으로 다시 정렬해버린다.
 def groups: reduce .[] as $p ([];
@@ -20,30 +22,32 @@ def groups: reduce .[] as $p ([];
     else .[$i].prs += [$p] end);
 
 # reminderCc 는 옛 형식(문자열)과 새 형식([{name, slackId}])을 모두 받는다.
-def ccPeople: if type == "array" then . elif type == "string" and . != "" then [{text: .}] else [] end;
+def ccPeople:
+  if type == "array" then map(if type == "string" then {text: .} elif type == "object" then . else empty end)
+  elif type == "string" and . != "" then [{text: .}] else [] end;
 
 def mention($ws):
   if .text then (.text | @html)
-  elif (.slackId // "") != "" and $ws != "" then
-    ("@" + .name) as $label
+  elif (.slackId | type) == "string" and .slackId != "" and $ws != "" then
+    ("@" + (.name // "" | tostring)) as $label
     | "<a target=\"_blank\" class=\"c-member_slug c-member_slug--link\""
       + " data-member-id=\"\(.slackId | @html)\" data-member-label=\"\($label | @html)\""
       + " data-stringify-type=\"mention\" data-stringify-id=\"\(.slackId | @html)\""
       + " data-stringify-label=\"\($label | @html)\""
       + " href=\"https://\($ws | @html).slack.com/team/\(.slackId | @html)\""
       + " rel=\"noopener noreferrer\">\($label | @html)</a>"
-  else "@" + .name | @html end;
+  else "@" + (.name // "" | tostring) | @html end;
 
 def reminder($prs; $lead; $config):
-  ($config.reminderExcludeRepos // []) as $ex
-  | ($config.slackWorkspace // "") as $ws
+  ($config.reminderExcludeRepos | strList) as $ex
+  | ($config.slackWorkspace | if type == "string" then . else "" end) as $ws
   | ($config.reminderCc | ccPeople) as $cc
   | [ $prs[] | select(.repo | excluded($ex) | not) ] as $list
   | if ($list | length) == 0 then null else
       ($list | groups) as $g
       | { count: ($list | length),
           text: ([$lead, ($g | map("*\(.repo)*\n" + (.prs | map("• \(.title) \(.url)") | join("\n"))) | join("\n\n"))]
-                 + (if ($cc | length) > 0 then ["cc " + ($cc | map(.text // ("@" + .name)) | join(" "))] else [] end)
+                 + (if ($cc | length) > 0 then ["cc " + ($cc | map(.text // ("@" + (.name // "" | tostring))) | join(" "))] else [] end)
                  | join("\n\n")),
           html: ("<meta charset=\"utf-8\">"
                  + ([($lead | @html),

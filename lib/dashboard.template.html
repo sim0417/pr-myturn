@@ -693,6 +693,11 @@
     .replace(/\s+/g, " ")
     .trim();
 
+  // 앱 창 안에서는 이 다리로 앱에게 말을 건다(새로고침·복사). 브라우저에는 없다.
+  const native = window.webkit
+    && window.webkit.messageHandlers
+    && window.webkit.messageHandlers.prMyturn;
+
   // 슬랙 멘션은 HTML 로 붙여넣어야 살아난다. copy 이벤트에서 평문과 HTML 을
   // 함께 싣는다. 클릭 직후 동기로 불러야 하므로 await 보다 앞에 둔다.
   function copyRich(text, html) {
@@ -711,6 +716,11 @@
 
   // file:// 로 열면 navigator.clipboard 가 막히므로 execCommand 로 물러선다.
   async function copyText(text, html) {
+    if (html && native) {
+      // WKWebView 는 선택 영역 없이 copy 이벤트를 쏘지 않을 수 있다. 앱이 직접 싣는다.
+      native.postMessage({ copy: { text, html } });
+      return true;
+    }
     if (html && copyRich(text, html)) return true;
     try {
       if (navigator.clipboard && window.isSecureContext) {
@@ -751,9 +761,6 @@
     });
     return b;
   }
-
-  // 레포 이름은 슬랙에서 소유자 없이 쓴다 (acme/acme-web → acme-web).
-  const shortRepo = r => r.split("/").pop();
 
   // 평소 슬랙에 올리는 모양: "설명 PR 입니다" + 링크
   const oneLine = pr => pr.title + " PR 입니다\n" + pr.url;
@@ -926,9 +933,6 @@
 
   // 앱 창 안에서만 새로고침을 걸 수 있다. 브라우저에는 이 다리가 없으므로
   // 버튼을 숨긴 채로 둔다. 눌리지 않는 버튼을 보여주는 것보다 낫다.
-  const native = window.webkit
-    && window.webkit.messageHandlers
-    && window.webkit.messageHandlers.prMyturn;
 
   if (native) {
     const btn = document.getElementById("refresh");

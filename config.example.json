@@ -9,7 +9,13 @@
 
   "bots": ["github-actions", "dependabot", "codecov", "renovate"],
 
-  "reminderCc": "",
+  "reminderCc": [
+    { "name": "Octo Cat", "slackId": "U0123ABCD" }
+  ],
+
+  "slackWorkspace": "",
+
+  "reminderExcludeRepos": [],
 
   "closedWithinDays": 30,
 

@@ -693,8 +693,25 @@
     .replace(/\s+/g, " ")
     .trim();
 
+  // 슬랙 멘션은 HTML 로 붙여넣어야 살아난다. copy 이벤트에서 평문과 HTML 을
+  // 함께 싣는다. 클릭 직후 동기로 불러야 하므로 await 보다 앞에 둔다.
+  function copyRich(text, html) {
+    let ok = false;
+    const on = e => {
+      e.clipboardData.setData("text/plain", text);
+      e.clipboardData.setData("text/html", html);
+      e.preventDefault();
+      ok = true;
+    };
+    document.addEventListener("copy", on);
+    try { document.execCommand("copy"); } catch (e) { /* 평문으로 물러선다 */ }
+    document.removeEventListener("copy", on);
+    return ok;
+  }
+
   // file:// 로 열면 navigator.clipboard 가 막히므로 execCommand 로 물러선다.
-  async function copyText(text) {
+  async function copyText(text, html) {
+    if (html && copyRich(text, html)) return true;
     try {
       if (navigator.clipboard && window.isSecureContext) {
         await navigator.clipboard.writeText(text);
@@ -722,7 +739,8 @@
     b.addEventListener("click", async ev => {
       ev.preventDefault();
       ev.stopPropagation();
-      const ok = await copyText(getText());
+      const got = getText();
+      const ok = typeof got === "string" ? await copyText(got) : await copyText(got.text, got.html);
       b.textContent = ok ? "복사됨" : "복사 실패";
       b.dataset[ok ? "done" : "failed"] = "1";
       setTimeout(() => {
@@ -740,22 +758,8 @@
   // 평소 슬랙에 올리는 모양: "설명 PR 입니다" + 링크
   const oneLine = pr => pr.title + " PR 입니다\n" + pr.url;
 
-  // 여러 건 리마인드: 레포별로 묶고 끝에 cc 를 붙인다.
-  function reminderText(list, lead) {
-    const groups = new Map();
-    list.forEach(pr => {
-      const k = shortRepo(pr.repo);
-      if (!groups.has(k)) groups.set(k, []);
-      groups.get(k).push(pr);
-    });
-    const body = [...groups.entries()]
-      .map(([repo, prs]) =>
-        "*" + repo + "*\n" + prs.map(p => "• " + p.title + " " + p.url).join("\n"))
-      .join("\n\n");
-    // 리마인드 끝에 붙일 멘션도 설정에서 온다. 없으면 붙이지 않는다.
-    const cc = CONFIG.reminderCc ? "\n\ncc " + CONFIG.reminderCc : "";
-    return lead + "\n\n" + body + cc;
-  }
+  // 여러 건 리마인드는 lib/reminder.jq 가 만들어 둔다. 메뉴바도 같은 것을 복사한다.
+  const REMINDERS = DATA.reminders || {};
 
   const el = (tag, cls, text) => {
     const n = document.createElement(tag);
@@ -853,14 +857,9 @@
          ageFmt: d => d < 1 ? "오늘 답글" : Math.round(d) + "일 전 답글" },
        "내 리뷰에 달린 미확인 답글이 없습니다.");
 
-  const waitSorted = [...mine].sort(byAge);
-  headCopy("h-wait", "슬랙 리마인드 복사",
-    () => reminderText(waitSorted, "올린 PR 중 아직 리뷰 전인 건들입니다. 확인 한번 부탁 드립니다."),
-    waitSorted.length > 0);
-
-  headCopy("h-ready", "슬랙 문구 복사",
-    () => reminderText(readyToMerge, "아래 PR 승인 감사합니다. 머지하겠습니다."),
-    readyToMerge.length > 0);
+  // 제외 저장소만 남은 구획에는 복사할 문구가 없으므로 버튼을 달지 않는다.
+  headCopy("h-wait", "슬랙 리마인드 복사", () => REMINDERS.wait, !!REMINDERS.wait);
+  headCopy("h-ready", "슬랙 문구 복사", () => REMINDERS.ready, !!REMINDERS.ready);
 
   const arc = document.getElementById("arc");
   archive.forEach(x => {
@@ -922,6 +921,7 @@
   // 소유자 이름이 어떤 글자로 끝나든 어색하지 않도록 조사를 붙이지 않는다.
   document.getElementById("excluded").textContent =
     (CONFIG.excludeNote ? "제외한 소유자: " + CONFIG.excludeNote + " · " : "")
+    + (CONFIG.reminderExcludeNote ? "리마인드에서 뺀 저장소: " + CONFIG.reminderExcludeNote + " · " : "")
     + "봇 코멘트는 집계에서 제외했습니다.";
 
   // 앱 창 안에서만 새로고침을 걸 수 있다. 브라우저에는 이 다리가 없으므로

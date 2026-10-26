@@ -81,8 +81,13 @@ else
   fi
   [ -f "$CLOSED_CACHE" ] || echo '[]' > "$CLOSED_CACHE"
 
+  # 리마인드 문구는 메뉴바와 같은 생성기에서 만든다. 두 벌로 두면 언젠가 어긋난다.
+  reminders=$(jq -n --argjson mine "$mine" --argjson config "$CONFIG" '{mine: $mine, config: $config}' \
+              | jq -f "$LIB/reminder.jq")
+
   # 표시 이름·리마인드 문구 같은 개인 설정은 코드가 아니라 설정 파일에서 온다.
   DATA=$(jq -n \
+    --argjson reminders "$reminders" \
     --argjson mine "$mine" \
     --argjson open "$replies_open" \
     --argjson closed "$(cat "$CLOSED_CACHE")" \
@@ -92,11 +97,11 @@ else
     --argjson closedAge "$closed_age" \
     '{generatedAt: $now, closedAgeSec: $closedAge,
       mine: $mine, reviewedOpen: $open, reviewedClosed: $closed,
-      reviewRequests: $requests,
+      reviewRequests: $requests, reminders: $reminders,
       config: { names: ($config.names // {}),
                 displayName: ($config.displayName // ""),
-                reminderCc: ($config.reminderCc // ""),
-                excludeNote: ($config.excludeOwners // [] | join(", ")) }}')
+                excludeNote: ($config.excludeOwners // [] | join(", ")),
+                reminderExcludeNote: ($config.reminderExcludeRepos // [] | join(", ")) }}')
 
   write_status "$mine" "$replies_open" "$requests"
 

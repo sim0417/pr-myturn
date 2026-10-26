@@ -24,6 +24,7 @@ from window import DashboardWindow
 
 REPO = pathlib.Path(__file__).resolve().parents[2]
 DASHBOARD = REPO / "bin" / "pr-dashboard.sh"
+REMINDER = REPO / "bin" / "pr-reminder.sh"
 
 # 산출물은 전부 pr-dashboard.sh 가 쓴다. 앱은 배지를 그리려고 status.json 을
 # 읽고, 창에는 dashboard.html 을 띄운다.
@@ -51,6 +52,25 @@ def config():
         return json.loads(CONFIG_PATH.read_text())
     except (OSError, ValueError):
         return {}
+
+
+def save_config(cfg):
+    """설정 파일을 고쳐 쓴다. 팀원 실명이 담기므로 소유자 전용 권한을 유지한다."""
+    CONFIG_PATH.parent.mkdir(parents=True, exist_ok=True)
+    tmp = CONFIG_PATH.with_suffix(".tmp")
+    tmp.write_text(json.dumps(cfg, ensure_ascii=False, indent=2) + "\n")
+    tmp.chmod(0o600)
+    tmp.replace(CONFIG_PATH)
+
+
+def copy_to_clipboard(text, html):
+    """평문과 HTML 을 함께 싣는다. 슬랙은 HTML 쪽 멘션 링크를 보고 멘션을 만든다."""
+    from AppKit import NSPasteboard, NSPasteboardTypeHTML, NSPasteboardTypeString
+    pb = NSPasteboard.generalPasteboard()
+    pb.clearContents()
+    pb.setString_forType_(text, NSPasteboardTypeString)
+    if html:
+        pb.setString_forType_(html, NSPasteboardTypeHTML)
 
 
 def notify(title, message):
@@ -177,6 +197,8 @@ class Dashboard(rumps.App):
                 items.append(rumps.MenuItem("열린 PR 이 없습니다"))
 
         items.append(rumps.separator)
+        if not self.error:
+            items += self.reminder_items()
         items.append(rumps.MenuItem("대시보드 열기", callback=self.open_dashboard))
         items.append(rumps.MenuItem("지금 새로고침", callback=self.tick))
         if self.fetched_at:
@@ -201,6 +223,36 @@ class Dashboard(rumps.App):
         out.append(rumps.separator)
         return out
 
+    def reminder_items(self):
+        """리마인드 복사와, 리마인드에서 뺄 저장소를 고르는 하위 메뉴."""
+        # 고를 수 있는 저장소 = 리마인드에 들어갈 수 있는 PR 의 저장소 + 이미 뺀 것.
+        # 뺀 저장소의 PR 이 다 닫혀도 목록에 남아야 다시 넣을 수 있다.
+        excluded = config().get("reminderExcludeRepos") or []
+        repos = []
+        for p in self.waiting + self.ready_to_merge:
+            if p["repo"] not in repos:
+                repos.append(p["repo"])
+        repos += [r for r in excluded if r not in repos]
+        if not repos:
+            return []
+
+        out = []
+        if any(not self.is_excluded(p["repo"], excluded) for p in self.waiting):
+            out.append(rumps.MenuItem("리마인드 메시지 복사", callback=self.copy_reminder))
+        picker = rumps.MenuItem("리마인드에서 뺄 저장소")
+        for repo in repos:
+            item = rumps.MenuItem(repo, callback=self.toggle_exclude)
+            item.state = int(self.is_excluded(repo, excluded))
+            item.repo = repo
+            picker.add(item)
+        out.append(picker)
+        return out
+
+    @staticmethod
+    def is_excluded(repo, excluded):
+        # lib/reminder.jq 와 같은 규칙: "owner/repo" 또는 "repo" 로 적을 수 있다.
+        return repo in excluded or repo.split("/")[-1] in excluded
+
     def announce(self, pending):
         """답변 필요·리뷰 요청이 늘어난 순간에만 알린다. 같은 건으로 반복해 알리지 않는다."""
         if self.last_pending is not None and pending > self.last_pending:
@@ -211,6 +263,50 @@ class Dashboard(rumps.App):
 
     def open_pr(self, sender):
         subprocess.run(["open", sender.pr_url], env=ENV)
+
+    def copy_reminder(self, _):
+        """대시보드의 "슬랙 리마인드 복사" 와 같은 문구를 클립보드에 담는다.
+
+        status.json 에서 바로 만드므로 GitHub 을 다시 부르지 않는다. 문구는
+        pr-reminder.sh(lib/reminder.jq) 하나가 만든다. 여기서 따로 조립하지 않는다.
+        """
+        try:
+            out = subprocess.run([str(REMINDER), "--json"], env=ENV,
+                                 capture_output=True, text=True, timeout=10, check=True)
+            wait = json.loads(out.stdout).get("wait")
+        except (subprocess.CalledProcessError, subprocess.TimeoutExpired, ValueError) as e:
+            notify("리마인드 복사 실패", str(e)[:80])
+            return
+        if not wait:
+            notify("리마인드 복사", "리마인드할 PR 이 없습니다")
+            return
+        copy_to_clipboard(wait["text"], wait["html"])
+        notify("리마인드 복사됨", f"{wait['count']}건 — 슬랙에 붙여넣으세요")
+
+    def toggle_exclude(self, sender):
+        """누른 저장소를 리마인드 제외 목록에 넣거나 뺀다."""
+        # config() 는 깨진 파일을 {} 로 넘긴다. 그걸 그대로 저장하면 설정이 통째로
+        # 날아가므로, 여기서는 직접 읽고 못 읽으면 손대지 않는다.
+        try:
+            cfg = json.loads(CONFIG_PATH.read_text()) if CONFIG_PATH.exists() else {}
+        except (OSError, ValueError) as e:
+            notify("설정 파일을 읽을 수 없습니다", str(e)[:80])
+            return
+        excluded = cfg.get("reminderExcludeRepos") or []
+        repo = sender.repo
+        if self.is_excluded(repo, excluded):
+            excluded = [r for r in excluded if r not in (repo, repo.split("/")[-1])]
+        else:
+            excluded.append(repo)
+        cfg["reminderExcludeRepos"] = excluded
+        try:
+            save_config(cfg)
+        except OSError as e:
+            notify("설정을 저장하지 못했습니다", str(e)[:80])
+            return
+        self.render()
+        # 대시보드에 박힌 문구도 새 제외 목록으로 다시 만든다.
+        self.tick(None)
 
     def open_dashboard(self, _):
         """있는 화면을 바로 띄우고, 갱신은 뒤에서 한다.

@@ -73,7 +73,9 @@ launchctl bootstrap "gui/$UID" "$PLIST"
 # 런처 앱. 실행 파일은 셸 스크립트 하나다. 서명·빌드를 관리할 필요가 없다.
 # LSUIElement 라 Dock 에 아이콘이 남지 않는다.
 rm -rf "$LAUNCHER"
-mkdir -p "$LAUNCHER/Contents/MacOS"
+mkdir -p "$LAUNCHER/Contents/MacOS" "$LAUNCHER/Contents/Resources"
+# 아이콘 원본은 icon/icon.svg. 바꾸면 iconutil 로 AppIcon.icns 를 다시 만든다.
+cp "$HERE/icon/AppIcon.icns" "$LAUNCHER/Contents/Resources/AppIcon.icns"
 cat > "$LAUNCHER/Contents/Info.plist" <<EOF
 <?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
@@ -82,6 +84,7 @@ cat > "$LAUNCHER/Contents/Info.plist" <<EOF
   <key>CFBundleName</key><string>PR MyTurn</string>
   <key>CFBundleIdentifier</key><string>com.pr-myturn.launcher</string>
   <key>CFBundleExecutable</key><string>launch</string>
+  <key>CFBundleIconFile</key><string>AppIcon</string>
   <key>CFBundlePackageType</key><string>APPL</string>
   <key>CFBundleShortVersionString</key><string>1.0</string>
   <key>LSUIElement</key><true/>
